@@ -3,34 +3,36 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Oscillo Lab — 完全版（ズーム中も左クリックでマーカー）</title>
+  <title>Oscillo Lab — 完全版（オシレーター同時記録統合）</title>
   <style>
     :root{
-      --bg:#0c0f14; --panel:#121722; --panel-2:#0f1420; --brand:#4dd0e1; --brand-2:#81ecec;
-      --text:#eaf2ff; --muted:#97a2b1; --accent:#7c4dff; --ok:#00e676; --warn:#ffd54f; --err:#ff5252;
+      --bg:#0c0f14; --panel:#121722; --panel-2:#0f1420; --brand:#4dd0e1; --accent:#7c4dff;
+      --text:#ffffff; --muted:#eeeeee;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{margin:0;background:radial-gradient(1200px 800px at 70% -10%,#1c2435 0%,#0c0f14 60%);color:var(--text);
          font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Noto Sans JP",sans-serif;letter-spacing:.02em;display:flex}
-    #sidebar{width:360px;background:linear-gradient(180deg,#0d121c,#0a0e15);border-right:1px solid #1b2637;padding:12px;overflow:auto}
+    #sidebar{width:380px;background:linear-gradient(180deg,#0d121c,#0a0e15);border-right:1px solid #1b2637;padding:12px;overflow:auto}
     #main{flex:1;display:flex;flex-direction:column}
     header{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #1b2637}
     header .title{font-weight:800;letter-spacing:.05em}
     header .right{display:flex;gap:8px;align-items:center}
-    button{appearance:none;border:0;border-radius:10px;padding:8px 12px;color:#0b1016;background:#1a2333;cursor:pointer;font-weight:700}
+    button{appearance:none;border:0;border-radius:10px;padding:8px 12px;color:#fff;background:#1a2333;cursor:pointer;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,0.8)}
     button:hover{filter:brightness(1.12)}
-    .btn-primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:#071018}
+    .btn-primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:#fff}
     canvas{flex:1;display:block;background:linear-gradient(180deg,#0b1018,#0a0f14);cursor:crosshair}
     .card{background:linear-gradient(180deg,#0e1420,#0b111a);border:1px solid #1b2637;border-radius:14px;padding:12px;margin:10px 0}
-    .card h3{margin:0 0 10px;font-size:15px;color:#cfe5ff;border-bottom:1px solid #1b2637;padding-bottom:6px}
+    .card h3{margin:0 0 10px;font-size:15px;color:#fff;border-bottom:1px solid #1b2637;padding-bottom:6px}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
     .row > *{flex:0 0 auto}
     label{font-size:12px;color:var(--muted)}
-    select,input[type="number"],input[type="text"]{background:#0d1220;border:1px solid #203046;border-radius:10px;padding:6px;color:var(--text)}
+    select,input[type="number"],input[type="text"]{background:#0d1220;border:1px solid #203046;border-radius:10px;padding:6px;color:#fff}
     input[type="range"]{accent-color:#6de;cursor:pointer}
     .small{font-size:12px;color:var(--muted)}
-    #log{font-size:12px;background:#000;border:1px solid #1b2637;border-radius:10px;padding:8px;max-height:140px;overflow:auto}
+    #log{font-size:12px;background:#000;border:1px solid #1b2637;border-radius:10px;padding:8px;max-height:140px;overflow:auto;color:#0f0}
+    .muted{opacity:.85}
+    .hide{display:none}
   </style>
 </head>
 <body>
@@ -42,15 +44,42 @@
         <select id="comboType">
           <option value="pulse">理想パルス</option>
           <option value="noise">短いホワイトノイズ</option>
+          <option value="osc">オシレーター</option>
         </select>
       </div>
-      <div class="row">
+
+      <!-- パルス/ノイズ 共通 -->
+      <div class="row combo-common">
         <label>発音長さ(ms)</label>
-        <input id="comboDurMs" type="number" value="20" step="1" min="1">
+        <input id="comboDurMs" type="number" value="200" step="1" min="1">
+        <label>音量</label>
+        <input id="comboGain" type="range" min="0" max="1" step="0.01" value="0.9">
+      </div>
+
+      <!-- オシレーター詳細 -->
+      <div id="comboOscPanel" class="card muted">
+        <h3 style="border:none;margin:0 0 6px 0;padding:0;">⚙ オシレーター設定</h3>
+        <div class="row">
+          <label>波形</label>
+          <select id="comboOscWave">
+            <option value="sine" selected>正弦波</option>
+            <option value="square">矩形波</option>
+            <option value="triangle">三角波</option>
+            <option value="sawtooth">のこぎり波</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>周波数(100–1000Hz)</label>
+          <input type="range" id="comboOscFreqSlider" min="100" max="1000" step="1" value="440">
+          <input type="number" id="comboOscFreqInput" value="440" step="1" style="width:90px">
+        </div>
+      </div>
+
+      <div class="row">
         <label>事前待機(ms)</label>
-        <input id="comboPreMs" type="number" value="80" step="1" min="0">
+        <input id="comboPreMs" type="number" value="200" step="10" min="0">
         <label>事後(ms)</label>
-        <input id="comboPostMs" type="number" value="300" step="10" min="0">
+        <input id="comboPostMs" type="number" value="500" step="10" min="0">
       </div>
       <div class="row">
         <button id="btnCombo" class="btn-primary">▶ 録音→発音→停止</button>
@@ -58,7 +87,7 @@
       <div class="row">
         <label><input id="chkShowRec" type="checkbox"> 録音結果を表示</label>
       </div>
-      <div class="small">チェックON時はリアル表示を止め、最新の録音結果（波形/FFT）。<br>左クリック＝マーカー、右ドラッグ＝ズーム、右クリック単押し/ダブルクリック＝ズーム解除。</div>
+      <div class="small">左クリック＝マーカー／右ドラッグ＝ズーム／右クリック単押しorダブルクリック＝ズーム解除。軸はズームに追従。</div>
     </div>
 
     <div class="card">
@@ -78,6 +107,32 @@
       <div class="row">
         <label>長さ(ms)</label><input id="impMs" type="number" value="20" step="1" min="1">
         <label>音量</label><input id="impGain" type="range" min="0" max="1" step="0.05" value="0.9">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🎵 オシレーター（単独）</h3>
+      <div class="row">
+        <label>波形</label>
+        <select id="oscWave">
+          <option value="sine" selected>正弦波</option>
+          <option value="square">矩形波</option>
+          <option value="triangle">三角波</option>
+          <option value="sawtooth">のこぎり波</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>周波数(100–1000Hz)</label>
+        <input type="range" id="oscFreqSlider" min="100" max="1000" step="1" value="440">
+        <input type="number" id="oscFreqInput" value="440" step="1" style="width:90px">
+      </div>
+      <div class="row">
+        <label>音量</label>
+        <input type="range" id="oscGain" min="0" max="1" step="0.01" value="0.5">
+      </div>
+      <div class="row">
+        <button id="btnOscStart" class="btn-primary">▶ Start</button>
+        <button id="btnOscStop">⏹ Stop</button>
       </div>
     </div>
 
@@ -183,6 +238,11 @@
     comboDurMs: document.getElementById('comboDurMs'),
     comboPreMs: document.getElementById('comboPreMs'),
     comboPostMs: document.getElementById('comboPostMs'),
+    comboGain: document.getElementById('comboGain'),
+    comboOscPanel: document.getElementById('comboOscPanel'),
+    comboOscWave: document.getElementById('comboOscWave'),
+    comboOscFreqSlider: document.getElementById('comboOscFreqSlider'),
+    comboOscFreqInput: document.getElementById('comboOscFreqInput'),
     // markers
     markA: document.getElementById('markA'),
     markB: document.getElementById('markB'),
@@ -194,6 +254,13 @@
     // device
     selDevice: document.getElementById('selDevice'),
     btnRefresh: document.getElementById('btnRefresh'),
+    // oscillator (standalone)
+    oscWave: document.getElementById('oscWave'),
+    oscFreqSlider: document.getElementById('oscFreqSlider'),
+    oscFreqInput: document.getElementById('oscFreqInput'),
+    oscGain: document.getElementById('oscGain'),
+    btnOscStart: document.getElementById('btnOscStart'),
+    btnOscStop: document.getElementById('btnOscStop'),
   };
 
   const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -222,6 +289,8 @@
     tZoom: [0,1],
     // right-drag zoom handling
     dragging: false, dragStartX: 0, dragEndX: 0, dragMoved: false,
+    // standalone oscillator
+    oscNode: null, oscGainNode: null
   };
 
   function log(m){ const d=document.createElement('div'); d.textContent='• '+m; els.log.prepend(d); }
@@ -314,7 +383,7 @@
     setTimeout(()=>URL.revokeObjectURL(url),1500);
   }
 
-  // Stimulus
+  // Simple impulse/noise
   function playStimulus(kind, durMs, gain=0.9){
     if(!state.ctx) state.ctx = new (window.AudioContext||window.webkitAudioContext)();
     const ctx = state.ctx;
@@ -326,18 +395,58 @@
     const g = ctx.createGain(); g.gain.value = gain;
     src.connect(g).connect(ctx.destination);
     src.start();
+    setTimeout(()=>{ try{src.stop();}catch{} }, durMs+5);
   }
 
-  // Combined: record -> play -> stop
+  // Oscillator (standalone)
+  function oscStart(){
+    if(!state.ctx) state.ctx=new (window.AudioContext||window.webkitAudioContext)();
+    oscStop();
+    const ctx=state.ctx;
+    const osc=ctx.createOscillator();
+    osc.type=els.oscWave.value;
+    const freq=parseFloat(els.oscFreqInput.value)||440;
+    osc.frequency.value=freq;
+    const g=ctx.createGain(); g.gain.value=parseFloat(els.oscGain.value);
+    osc.connect(g).connect(ctx.destination);
+    osc.start();
+    state.oscNode=osc; state.oscGainNode=g;
+    log(`オシレーター開始: ${osc.type}, ${freq}Hz`);
+  }
+  function oscStop(){
+    if(state.oscNode){ try{state.oscNode.stop();}catch{} state.oscNode.disconnect(); state.oscNode=null; }
+    if(state.oscGainNode){ state.oscGainNode.disconnect(); state.oscGainNode=null; }
+    log('オシレーター停止');
+  }
+
+  // Combined: record -> play (pulse/noise/osc) -> stop
   async function comboRecordPlay(){
     if(!state.mediaStream) await startMic();
     if(!state.mediaStream){ log('⚠ マイク未接続'); return; }
     const type = els.comboType.value;
-    const dur = parseInt(els.comboDurMs.value||'20',10);
-    const pre = parseInt(els.comboPreMs.value||'80',10);
-    const post = parseInt(els.comboPostMs.value||'300',10);
+    const dur = parseInt(els.comboDurMs.value||'200',10);
+    const pre = parseInt(els.comboPreMs.value||'200',10);
+    const post = parseInt(els.comboPostMs.value||'500',10);
+    const gain = parseFloat(els.comboGain.value||'0.9');
+
     startRec();
-    setTimeout(()=>{ playStimulus(type, dur, parseFloat(els.impGain.value||'0.9')); log(`発音(${type}, ${dur}ms)`); }, pre);
+    setTimeout(()=>{
+      if(type==='pulse' || type==='noise'){
+        playStimulus(type, dur, gain); log(`発音(${type}, ${dur}ms, gain=${gain})`);
+      }else if(type==='osc'){
+        if(!state.ctx) state.ctx=new (window.AudioContext||window.webkitAudioContext)();
+        const ctx=state.ctx;
+        const osc=ctx.createOscillator();
+        osc.type=els.comboOscWave.value;
+        let f=parseFloat(els.comboOscFreqInput.value)||440;
+        osc.frequency.value=f;
+        const g=ctx.createGain(); g.gain.value=gain;
+        osc.connect(g).connect(ctx.destination);
+        osc.start();
+        log(`発音(osc: ${osc.type}, ${f}Hz, gain=${gain})`);
+        setTimeout(()=>{ try{osc.stop();}catch{} }, dur);
+      }
+    }, pre);
     setTimeout(()=>{ stopRec(); }, pre + dur + post);
   }
 
@@ -349,7 +458,7 @@
     state.recVisSamples = merged;
   }
 
-  // FFT (simple radix-2)
+  // FFT (simple radix-2, for recorded FFT)
   function nextPow2(n){ let p=1; while(p<n) p<<=1; return p; }
   function fftMag(input){
     const N = nextPow2(input.length);
@@ -401,7 +510,7 @@
   function drawAxes(ctx, opt){
     if(!els.chkAxes.checked) return;
     const w=state.w, h=state.h;
-    ctx.fillStyle='#9fb3cc'; ctx.font=`${10*DPR}px system-ui`; ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillStyle='#ffffff'; ctx.font=`${10*DPR}px system-ui`; ctx.textAlign='left'; ctx.textBaseline='top';
     if(opt.mode==='time'){
       const ticks=6;
       const spanSec = opt.spanSec;
@@ -409,7 +518,7 @@
         const t=i/ticks * spanSec;
         const x=Math.round(i/ticks*w);
         ctx.fillRect(x, h-6*DPR, 1*DPR, 6*DPR);
-        ctx.fillText(Math.round(t*1000)+'ms', Math.min(x+2*DPR, w-46*DPR), h-14*DPR);
+        ctx.fillText(Math.round(t*1000)+'ms', Math.min(x+2*DPR, w-52*DPR), h-14*DPR);
       }
       const ya=[-1,-0.5,0,0.5,1];
       ya.forEach(v=>{ const y=Math.round((1-(v+1)/2)*h); ctx.fillRect(0,y,6*DPR,1*DPR); ctx.fillText(String(v),6*DPR+2*DPR,Math.max(0,y-8*DPR)); });
@@ -420,7 +529,7 @@
         const f=Math.round(i/ticks * ny);
         const x=Math.round(i/ticks*w);
         ctx.fillRect(x, h-6*DPR, 1*DPR, 6*DPR);
-        ctx.fillText(f+'Hz', Math.min(x+2*DPR, w-46*DPR), h-14*DPR);
+        ctx.fillText(f+'Hz', Math.min(x+2*DPR, w-52*DPR), h-14*DPR);
       }
       const ya=[0,-20,-40,-60,-80];
       ya.forEach((db,idx)=>{ const y=Math.round((idx/(ya.length-1))*h); ctx.fillRect(0,y,6*DPR,1*DPR); ctx.fillText(db+'dB',6*DPR+2*DPR,Math.max(0,y-8*DPR)); });
@@ -476,8 +585,7 @@
         const y=mid+v*scaleY;
         if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
       }
-      const grad=ctx.createLinearGradient(0,0,w,0); grad.addColorStop(0,'#4dd0e1'); grad.addColorStop(1,'#7c4dff');
-      ctx.strokeStyle=grad; ctx.lineWidth=Math.max(1,2*DPR); ctx.shadowColor='rgba(77,208,225,0.35)'; ctx.shadowBlur=8; ctx.stroke(); ctx.shadowBlur=0;
+      ctx.strokeStyle='#fff'; ctx.lineWidth=Math.max(1,2*DPR); ctx.stroke();
       drawAxes(ctx,{mode:'time', spanSec: state.timeSpanSec});
       drawMarkers(ctx, state.timeSpanSec);
     }
@@ -490,7 +598,7 @@
         const barH=mag*(h*0.9);
         const x=i*barW; const y=h-barH;
         const hue=180+120*mag;
-        ctx.fillStyle=`hsl(${hue} 70% 60% / 0.9)`;
+        ctx.fillStyle=`hsl(${hue} 80% 55% / 0.95)`;
         ctx.fillRect(x,y,barW-0.5,barH);
       }
       drawAxes(ctx,{mode:'freq', nyquist: (state.ctx? state.ctx.sampleRate/2 : 22050)});
@@ -512,8 +620,8 @@
         const y=mid + Math.max(-1,Math.min(1,arr[i]))*scaleY;
         if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
       }
-      ctx.strokeStyle='#d0f6ff'; ctx.lineWidth=Math.max(1,2*DPR); ctx.stroke();
-      const spanSec = (arr.length/state.recSR); // ズーム範囲の時間幅
+      ctx.strokeStyle='#ffffff'; ctx.lineWidth=Math.max(1,2*DPR); ctx.stroke();
+      const spanSec = (arr.length/state.recSR);
       drawAxes(ctx,{mode:'time', spanSec});
       drawMarkers(ctx, spanSec);
     }
@@ -535,7 +643,7 @@
         const barH=mag*(h*0.9);
         const x=i*barW; const y=h-barH;
         const hue=180+120*mag;
-        ctx.fillStyle=`hsl(${hue} 70% 60% / 0.9)`;
+        ctx.fillStyle=`hsl(${hue} 80% 55% / 0.95)`;
         ctx.fillRect(x,y,barW-0.5,barH);
       }
       const nyquist = state.recSR/2;
@@ -543,7 +651,7 @@
     }
 
     function drawNoData(){
-      ctx.fillStyle='rgba(255,255,255,0.5)';
+      ctx.fillStyle='rgba(255,255,255,0.65)';
       ctx.font=`${14*DPR}px system-ui`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText('録音結果がありません', w/2, h/2);
@@ -569,11 +677,14 @@
     loop();
   }
 
-  // ====== 操作（左クリック＝常にマーカー／右ドラッグ＝ズーム） ======
-  // 左クリック → マーカー（リアルタイムWaveform ＆ 録音結果Waveform の両方）
+  // ====== 操作（左クリック＝マーカー／右ドラッグ＝ズーム） ======
+  // 左クリック → マーカー
   els.canvas.addEventListener('mousedown', (ev)=>{
     if(ev.button===0){
-      if(state.view!=='time') return;
+      if(!((!els.chkShowRec.checked && true) || (els.chkShowRec.checked))){} // just to keep structure
+      // Waveform時のみ
+      const viewTime = (document.getElementById('btnWave').classList.contains('btn-primary'));
+      if(!viewTime) return;
       const rect = els.canvas.getBoundingClientRect();
       const x = (ev.clientX - rect.left) * DPR;
       let tSec;
@@ -616,24 +727,23 @@
     state.dragging=false;
     return true;
   }
-  // 右ボタン離し：ドラッグしていればズーム確定、ドラッグしていなければズーム解除
+  // 右ボタン離し：ドラッグしていればズーム確定、単押しならズーム解除
   els.canvas.addEventListener('mouseup', (ev)=>{
     if(ev.button!==2) return;
     if(!els.chkShowRec.checked) return;
     const moved = state.dragMoved;
     if(state.dragging){ applyZoomFromDrag(); }
     state.dragging=false; state.dragMoved=false;
-    if(!moved){
-      // 右クリック単押し＝ズーム解除
-      state.tZoom=[0,1];
-    }
+    if(!moved){ state.tZoom=[0,1]; } // 単押し＝解除
   });
   // コンテキストメニュー抑止
   els.canvas.addEventListener('contextmenu', (e)=>e.preventDefault());
   // ダブルクリック：ズーム＆マーカーリセット（Waveform時）
   els.canvas.addEventListener('dblclick', ()=>{
     if(els.chkShowRec.checked){ state.tZoom=[0,1]; }
-    if(state.view==='time'){
+    // Waveform時のみマーカーリセット
+    const viewTime = (document.getElementById('btnWave').classList.contains('btn-primary'));
+    if(viewTime){
       state.markerA=state.markerB=null; els.markA.value=els.markB.value='—'; els.deltaT.value='—'; els.speed.value='— m/s';
     }
   });
@@ -671,18 +781,40 @@
   document.getElementById('selDevice').addEventListener('change', e=>{ state.deviceId=e.target.value; if(state.mediaStream) startMic(); });
   document.getElementById('btnRefresh').addEventListener('click', listDevices);
 
-  window.addEventListener('keydown', (e)=>{
-    if(e.target && ['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
-    if(e.code==='Space'){ e.preventDefault(); state.mediaStream? stopMic() : startMic(); }
-    if(e.key==='r' || e.key==='R'){ e.preventDefault(); state.recording? stopRec() : startRec(); }
-    if(e.key==='t' || e.key==='T'){ e.preventDefault(); document.getElementById('btnWave').click(); }
-    if(e.key==='f' || e.key==='F'){ e.preventDefault(); document.getElementById('btnFFT').click(); }
+  // Oscillator (standalone) UI
+  els.btnOscStart.addEventListener('click', oscStart);
+  els.btnOscStop.addEventListener('click', oscStop);
+  els.oscWave.addEventListener('change', ()=>{ if(state.oscNode) state.oscNode.type=els.oscWave.value; });
+  els.oscFreqSlider.addEventListener('input', e=>{
+    els.oscFreqInput.value=e.target.value;
+    if(state.oscNode) state.oscNode.frequency.value=parseFloat(e.target.value);
+  });
+  els.oscFreqInput.addEventListener('input', e=>{
+    const val=parseFloat(e.target.value);
+    if(val<1000){ els.oscFreqSlider.value=val; }
+    if(state.oscNode) state.oscNode.frequency.value=val;
+  });
+  els.oscGain.addEventListener('input', e=>{ if(state.oscGainNode) state.oscGainNode.gain.value=parseFloat(e.target.value); });
+
+  // Combo type UI toggle
+  els.comboType.addEventListener('change', ()=>{
+    const isOsc = els.comboType.value==='osc';
+    els.comboOscPanel.classList.toggle('hide', !isOsc);
+  });
+  // keep initial
+  els.comboOscPanel.classList.toggle('hide', els.comboType.value!=='osc');
+  els.comboOscFreqSlider.addEventListener('input', e=>{
+    els.comboOscFreqInput.value=e.target.value;
+  });
+  els.comboOscFreqInput.addEventListener('input', e=>{
+    const v=parseFloat(e.target.value);
+    if(v<1000){ els.comboOscFreqSlider.value=v; }
   });
 
   // init
   listDevices();
   startMic();
-  log('準備完了：左クリック＝マーカー（ズーム中もOK）、右ドラッグ＝ズーム、右クリック単押し/ダブルクリック＝ズーム解除。');
+  log('準備完了：オシレーターは単独発音/同時記録の両方で使用可能。左クリック＝マーカー、右ドラッグ＝ズーム、右クリック単押し/ダブルクリック＝解除。');
 })();</script>
 </body>
 </html>
