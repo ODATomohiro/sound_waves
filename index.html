@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Oscillo Lab — 完全版（ズーム中も左クリックでマーカー）</title>
+  <style>
+    :root{
+      --bg:#0c0f14; --panel:#121722; --panel-2:#0f1420; --brand:#4dd0e1; --brand-2:#81ecec;
+      --text:#eaf2ff; --muted:#97a2b1; --accent:#7c4dff; --ok:#00e676; --warn:#ffd54f; --err:#ff5252;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:radial-gradient(1200px 800px at 70% -10%,#1c2435 0%,#0c0f14 60%);color:var(--text);
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Noto Sans JP",sans-serif;letter-spacing:.02em;display:flex}
+    #sidebar{width:360px;background:linear-gradient(180deg,#0d121c,#0a0e15);border-right:1px solid #1b2637;padding:12px;overflow:auto}
+    #main{flex:1;display:flex;flex-direction:column}
+    header{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #1b2637}
+    header .title{font-weight:800;letter-spacing:.05em}
+    header .right{display:flex;gap:8px;align-items:center}
+    button{appearance:none;border:0;border-radius:10px;padding:8px 12px;color:#0b1016;background:#1a2333;cursor:pointer;font-weight:700}
+    button:hover{filter:brightness(1.12)}
+    .btn-primary{background:linear-gradient(135deg,var(--brand),var(--accent));color:#071018}
+    canvas{flex:1;display:block;background:linear-gradient(180deg,#0b1018,#0a0f14);cursor:crosshair}
+    .card{background:linear-gradient(180deg,#0e1420,#0b111a);border:1px solid #1b2637;border-radius:14px;padding:12px;margin:10px 0}
+    .card h3{margin:0 0 10px;font-size:15px;color:#cfe5ff;border-bottom:1px solid #1b2637;padding-bottom:6px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+    .row > *{flex:0 0 auto}
+    label{font-size:12px;color:var(--muted)}
+    select,input[type="number"],input[type="text"]{background:#0d1220;border:1px solid #203046;border-radius:10px;padding:6px;color:var(--text)}
+    input[type="range"]{accent-color:#6de;cursor:pointer}
+    .small{font-size:12px;color:var(--muted)}
+    #log{font-size:12px;background:#000;border:1px solid #1b2637;border-radius:10px;padding:8px;max-height:140px;overflow:auto}
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <div class="card">
+      <h3>🎤 録音＋発音（同時記録）</h3>
+      <div class="row">
+        <label>種類</label>
+        <select id="comboType">
+          <option value="pulse">理想パルス</option>
+          <option value="noise">短いホワイトノイズ</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>発音長さ(ms)</label>
+        <input id="comboDurMs" type="number" value="20" step="1" min="1">
+        <label>事前待機(ms)</label>
+        <input id="comboPreMs" type="number" value="80" step="1" min="0">
+        <label>事後(ms)</label>
+        <input id="comboPostMs" type="number" value="300" step="10" min="0">
+      </div>
+      <div class="row">
+        <button id="btnCombo" class="btn-primary">▶ 録音→発音→停止</button>
+      </div>
+      <div class="row">
+        <label><input id="chkShowRec" type="checkbox"> 録音結果を表示</label>
+      </div>
+      <div class="small">チェックON時はリアル表示を止め、最新の録音結果（波形/FFT）。<br>左クリック＝マーカー、右ドラッグ＝ズーム、右クリック単押し/ダブルクリック＝ズーム解除。</div>
+    </div>
+
+    <div class="card">
+      <h3>🔴 録音（手動）</h3>
+      <div class="row">
+        <button id="btnRec">⏺ Start</button>
+        <button id="btnSave" disabled>💾 Save</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🔊 発音（単独）</h3>
+      <div class="row">
+        <button id="btnPulse">Pulse</button>
+        <button id="btnNoise">Noise</button>
+      </div>
+      <div class="row">
+        <label>長さ(ms)</label><input id="impMs" type="number" value="20" step="1" min="1">
+        <label>音量</label><input id="impGain" type="range" min="0" max="1" step="0.05" value="0.9">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>表示 / スケール</h3>
+      <div class="row">
+        <button id="btnWave" class="btn-primary">Waveform</button>
+        <button id="btnFFT">FFT</button>
+        <button id="btnFull">⤢ Fullscreen</button>
+      </div>
+      <div class="row">
+        <label><input id="chkAxes" type="checkbox" checked> 軸表示</label>
+        <label><input id="chkAutoNorm" type="checkbox" checked> 波形を自動正規化</label>
+      </div>
+      <div class="row">
+        <label>感度</label><input id="rangeGain" type="range" min="0.2" max="5" value="1" step="0.1">
+        <label>時間窓(秒)</label><input id="rangeTime" type="range" min="0.02" max="0.5" value="0.25" step="0.01">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📏 マーカー計測（音速）</h3>
+      <div class="row">
+        <span class="small">Waveform表示時：左クリックで A/B。ダブルクリックでリセット。</span>
+      </div>
+      <div class="row">
+        <label>A(s)</label><input id="markA" type="text" readonly value="—">
+        <label>B(s)</label><input id="markB" type="text" readonly value="—">
+        <label>Δt</label><input id="deltaT" type="text" readonly value="—">
+      </div>
+      <div class="row">
+        <label>距離 L(m)</label><input id="distance" type="number" value="2.0" step="0.1">
+        <label>往復倍率</label>
+        <select id="mult">
+          <option value="1">×1</option>
+          <option value="2" selected>×2</option>
+          <option value="4">×4</option>
+        </select>
+      </div>
+      <div class="row">
+        <button id="btnCalc" class="btn-primary">速度 v = 距離/Δt</button>
+      </div>
+      <div class="row">
+        <input id="speed" type="text" readonly value="— m/s">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🎙 入力デバイス</h3>
+      <div class="row">
+        <select id="selDevice"></select><button id="btnRefresh">⟳</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📝 ログ</h3>
+      <div id="log"></div>
+    </div>
+
+    <div class="card">
+      <h3>⌨️ ショートカット</h3>
+      <div class="small">
+        Space: マイク開始/停止 / R: 録音 / T: 波形 / F: FFT
+      </div>
+    </div>
+  </div>
+
+  <div id="main">
+    <header>
+      <div class="title">Oscillo Lab — 完全版</div>
+      <div class="right">SR: <span id="sr">—</span> Hz · FFT: <span id="fftSz">—</span></div>
+    </header>
+    <canvas id="scope"></canvas>
+  </div>
+
+<script>
+(()=>{
+  const els = {
+    canvas: document.getElementById('scope'),
+    sr: document.getElementById('sr'),
+    fftSz: document.getElementById('fftSz'),
+    log: document.getElementById('log'),
+    // view & scale
+    btnWave: document.getElementById('btnWave'),
+    btnFFT: document.getElementById('btnFFT'),
+    btnFull: document.getElementById('btnFull'),
+    chkAxes: document.getElementById('chkAxes'),
+    chkAutoNorm: document.getElementById('chkAutoNorm'),
+    chkShowRec: document.getElementById('chkShowRec'),
+    rangeGain: document.getElementById('rangeGain'),
+    rangeTime: document.getElementById('rangeTime'),
+    // record
+    btnRec: document.getElementById('btnRec'),
+    btnSave: document.getElementById('btnSave'),
+    // impulse single
+    btnPulse: document.getElementById('btnPulse'),
+    btnNoise: document.getElementById('btnNoise'),
+    impMs: document.getElementById('impMs'),
+    impGain: document.getElementById('impGain'),
+    // combo record+play
+    btnCombo: document.getElementById('btnCombo'),
+    comboType: document.getElementById('comboType'),
+    comboDurMs: document.getElementById('comboDurMs'),
+    comboPreMs: document.getElementById('comboPreMs'),
+    comboPostMs: document.getElementById('comboPostMs'),
+    // markers
+    markA: document.getElementById('markA'),
+    markB: document.getElementById('markB'),
+    deltaT: document.getElementById('deltaT'),
+    distance: document.getElementById('distance'),
+    mult: document.getElementById('mult'),
+    btnCalc: document.getElementById('btnCalc'),
+    speed: document.getElementById('speed'),
+    // device
+    selDevice: document.getElementById('selDevice'),
+    btnRefresh: document.getElementById('btnRefresh'),
+  };
+
+  const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+  const state = {
+    ctx: null,
+    analyser: null,
+    srcNode: null,
+    gainNode: null,
+    mediaStream: null,
+    deviceId: null,
+    view: 'time', // 'time' | 'fft'
+    timeSpanSec: parseFloat(els.rangeTime.value),
+    gain: parseFloat(els.rangeGain.value),
+    fftSize: 2048,
+    dataTime: null,
+    dataFreq: null,
+    w: 0, h: 0,
+    // markers
+    markerA: null, markerB: null,
+    // recorder
+    recorder: null, recording: false, chunks: [], lastBlob: null,
+    // recorded visualization buffer (PCM from analyser snapshots)
+    recVisSamples: new Float32Array(0), recSR: 48000,
+    // zoom (for recorded mode) normalized [0,1]
+    tZoom: [0,1],
+    // right-drag zoom handling
+    dragging: false, dragStartX: 0, dragEndX: 0, dragMoved: false,
+  };
+
+  function log(m){ const d=document.createElement('div'); d.textContent='• '+m; els.log.prepend(d); }
+
+  // Canvas sizing
+  function fitCanvas(){
+    state.w = Math.floor(els.canvas.clientWidth * DPR);
+    state.h = Math.floor((window.innerHeight - 48) * DPR);
+    els.canvas.width = state.w; els.canvas.height = state.h;
+    els.canvas.style.width = '100%'; els.canvas.style.height = (state.h/DPR)+'px';
+  }
+  new ResizeObserver(fitCanvas).observe(document.getElementById('main'));
+  fitCanvas();
+
+  // Devices
+  async function listDevices(){
+    try{
+      const list = await navigator.mediaDevices.enumerateDevices();
+      const audIns = list.filter(d=>d.kind==='audioinput');
+      els.selDevice.innerHTML = '';
+      audIns.forEach((d,i)=>{
+        const opt=document.createElement('option');
+        opt.value=d.deviceId; opt.textContent=d.label||`マイク ${i+1}`;
+        els.selDevice.appendChild(opt);
+      });
+      if(audIns.length){ if(!state.deviceId) state.deviceId = audIns[0].deviceId; els.selDevice.value=state.deviceId; }
+    }catch(e){ log('デバイス列挙に失敗: '+e.message); }
+  }
+
+  async function startMic(){
+    try{
+      if(state.mediaStream) stopMic();
+      const constraints = { audio: { deviceId: state.deviceId ? {exact: state.deviceId} : undefined, echoCancellation:false, noiseSuppression:false, autoGainControl:false } };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      state.mediaStream = stream;
+      if(!state.ctx) state.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = state.ctx;
+      state.recSR = ctx.sampleRate;
+
+      state.srcNode = ctx.createMediaStreamSource(stream);
+      state.gainNode = ctx.createGain(); state.gainNode.gain.value = state.gain;
+      state.analyser = ctx.createAnalyser(); state.analyser.fftSize = state.fftSize; state.analyser.smoothingTimeConstant = 0.12;
+      state.srcNode.connect(state.gainNode); state.gainNode.connect(state.analyser);
+
+      state.dataTime = new Float32Array(state.analyser.fftSize);
+      state.dataFreq = new Uint8Array(state.analyser.frequencyBinCount);
+
+      els.sr.textContent = ctx.sampleRate.toFixed(0);
+      els.fftSz.textContent = state.analyser.fftSize + ' / ' + (state.analyser.frequencyBinCount*2);
+      renderLoop();
+      log('マイク開始');
+    }catch(e){ log('マイク開始失敗: '+e.message); }
+  }
+  function stopMic(){
+    if(state.mediaStream){ state.mediaStream.getTracks().forEach(t=>t.stop()); state.mediaStream=null; }
+    if(state.srcNode){ try{ state.srcNode.disconnect(); }catch{} state.srcNode=null; }
+    if(state.gainNode){ try{ state.gainNode.disconnect(); }catch{} state.gainNode=null; }
+    if(state.analyser){ state.analyser=null; }
+    log('マイク停止');
+  }
+
+  // Recorder
+  function startRec(){
+    if(!state.mediaStream){ log('⚠ マイク未接続'); return; }
+    try{
+      state.recorder = new MediaRecorder(state.mediaStream);
+    }catch(e){ log('Recorder作成失敗: '+e.message); return; }
+    state.chunks = [];
+    state.recVisSamples = new Float32Array(0); // reset viz buffer
+    state.recorder.ondataavailable = e=>{ if(e.data && e.data.size>0) state.chunks.push(e.data); };
+    state.recorder.onstop = ()=>{
+      state.lastBlob = new Blob(state.chunks, {type: state.recorder.mimeType || 'audio/webm'});
+      els.btnSave.disabled = !state.lastBlob;
+      log('録音完了: '+Math.round((state.lastBlob?.size||0)/1024)+' KB');
+    };
+    state.recorder.start();
+    state.recording = true; els.btnRec.textContent = '⏹ Stop';
+    log('録音開始');
+  }
+  function stopRec(){
+    if(state.recorder && state.recording){ state.recorder.stop(); }
+    state.recording = false; els.btnRec.textContent = '⏺ Start';
+    log('録音停止');
+  }
+  function saveAudio(){
+    if(!state.lastBlob){ return; }
+    const ext = (state.recorder && state.recorder.mimeType && state.recorder.mimeType.includes('webm')) ? 'webm' : 'ogg';
+    const url = URL.createObjectURL(state.lastBlob);
+    const a=document.createElement('a'); a.href=url; a.download=`oscillo-recording-${Date.now()}.${ext}`; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }
+
+  // Stimulus
+  function playStimulus(kind, durMs, gain=0.9){
+    if(!state.ctx) state.ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const ctx = state.ctx;
+    const frames = Math.max(1, Math.round(ctx.sampleRate * (durMs/1000)));
+    const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    if(kind==='pulse') data[0]=1.0; else for(let i=0;i<frames;i++) data[i]=(Math.random()*2-1)*0.5;
+    const src = ctx.createBufferSource(); src.buffer = buffer;
+    const g = ctx.createGain(); g.gain.value = gain;
+    src.connect(g).connect(ctx.destination);
+    src.start();
+  }
+
+  // Combined: record -> play -> stop
+  async function comboRecordPlay(){
+    if(!state.mediaStream) await startMic();
+    if(!state.mediaStream){ log('⚠ マイク未接続'); return; }
+    const type = els.comboType.value;
+    const dur = parseInt(els.comboDurMs.value||'20',10);
+    const pre = parseInt(els.comboPreMs.value||'80',10);
+    const post = parseInt(els.comboPostMs.value||'300',10);
+    startRec();
+    setTimeout(()=>{ playStimulus(type, dur, parseFloat(els.impGain.value||'0.9')); log(`発音(${type}, ${dur}ms)`); }, pre);
+    setTimeout(()=>{ stopRec(); }, pre + dur + post);
+  }
+
+  // Append analyser snapshot into recorded viz buffer (during recording)
+  function appendRecVis(samples){
+    const old = state.recVisSamples;
+    const merged = new Float32Array(old.length + samples.length);
+    merged.set(old, 0); merged.set(samples, old.length);
+    state.recVisSamples = merged;
+  }
+
+  // FFT (simple radix-2)
+  function nextPow2(n){ let p=1; while(p<n) p<<=1; return p; }
+  function fftMag(input){
+    const N = nextPow2(input.length);
+    const re = new Float32Array(N);
+    const im = new Float32Array(N);
+    re.set(input);
+    let j=0;
+    for(let i=1;i<N;i++){
+      let bit=N>>1;
+      for(; j & bit; bit>>=1){ j ^= bit; }
+      j ^= bit;
+      if(i<j){ const tr=re[i]; re[i]=re[j]; re[j]=tr; const ti=im[i]; im[i]=im[j]; im[j]=ti; }
+    }
+    for(let len=2; len<=N; len<<=1){
+      const ang = -2*Math.PI/len;
+      const wlenRe = Math.cos(ang), wlenIm = Math.sin(ang);
+      for(let i=0;i<N;i+=len){
+        let wRe=1, wIm=0;
+        for(let k=0;k<(len>>1);k++){
+          const uRe=re[i+k], uIm=im[i+k];
+          const vRe=re[i+k+(len>>1)]*wRe - im[i+k+(len>>1)]*wIm;
+          const vIm=re[i+k+(len>>1)]*wIm + im[i+k+(len>>1)]*wRe;
+          re[i+k] = uRe + vRe; im[i+k] = uIm + vIm;
+          re[i+k+(len>>1)] = uRe - vRe; im[i+k+(len>>1)] = uIm - vIm;
+          const nwRe = wRe*wlenRe - wIm*wlenIm;
+          const nwIm = wRe*wlenIm + wIm*wlenRe;
+          wRe = nwRe; wIm = nwIm;
+        }
+      }
+    }
+    const mags = new Float32Array(N/2);
+    for(let i=0;i<N/2;i++){ mags[i] = Math.sqrt(re[i]*re[i] + im[i]*im[i]) / (N/2); }
+    return mags;
+  }
+
+  // Drawing helpers
+  function drawGrid(ctx){
+    const w=state.w, h=state.h;
+    const g=ctx.createLinearGradient(0,0,0,h);
+    g.addColorStop(0,'#0b1018'); g.addColorStop(1,'#0a0f14');
+    ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
+    ctx.beginPath();
+    const gx=10, gy=8;
+    for(let i=1;i<gx;i++){ const x=(w*i/gx)|0; ctx.moveTo(x,0); ctx.lineTo(x,h); }
+    for(let j=1;j<gy;j++){ const y=(h*j/gy)|0; ctx.moveTo(0,y); ctx.lineTo(w,y); }
+    ctx.stroke();
+  }
+  function drawAxes(ctx, opt){
+    if(!els.chkAxes.checked) return;
+    const w=state.w, h=state.h;
+    ctx.fillStyle='#9fb3cc'; ctx.font=`${10*DPR}px system-ui`; ctx.textAlign='left'; ctx.textBaseline='top';
+    if(opt.mode==='time'){
+      const ticks=6;
+      const spanSec = opt.spanSec;
+      for(let i=0;i<=ticks;i++){
+        const t=i/ticks * spanSec;
+        const x=Math.round(i/ticks*w);
+        ctx.fillRect(x, h-6*DPR, 1*DPR, 6*DPR);
+        ctx.fillText(Math.round(t*1000)+'ms', Math.min(x+2*DPR, w-46*DPR), h-14*DPR);
+      }
+      const ya=[-1,-0.5,0,0.5,1];
+      ya.forEach(v=>{ const y=Math.round((1-(v+1)/2)*h); ctx.fillRect(0,y,6*DPR,1*DPR); ctx.fillText(String(v),6*DPR+2*DPR,Math.max(0,y-8*DPR)); });
+    }else{
+      const ny = opt.nyquist;
+      const ticks=6;
+      for(let i=0;i<=ticks;i++){
+        const f=Math.round(i/ticks * ny);
+        const x=Math.round(i/ticks*w);
+        ctx.fillRect(x, h-6*DPR, 1*DPR, 6*DPR);
+        ctx.fillText(f+'Hz', Math.min(x+2*DPR, w-46*DPR), h-14*DPR);
+      }
+      const ya=[0,-20,-40,-60,-80];
+      ya.forEach((db,idx)=>{ const y=Math.round((idx/(ya.length-1))*h); ctx.fillRect(0,y,6*DPR,1*DPR); ctx.fillText(db+'dB',6*DPR+2*DPR,Math.max(0,y-8*DPR)); });
+    }
+  }
+  function drawMarkers(ctx, spanSec){
+    if(state.view!=='time') return;
+    const w=state.w, h=state.h;
+    const drawOne = (t, label, color)=>{
+      if(t==null) return;
+      const x = Math.max(0, Math.min(w-1, t/spanSec * w));
+      ctx.save();
+      ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=1*DPR;
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+      ctx.fillRect(x-3*DPR, 8*DPR, 6*DPR, 6*DPR);
+      ctx.font = `${12*DPR}px system-ui, sans-serif`;
+      ctx.textAlign='left'; ctx.textBaseline='top';
+      ctx.fillText(`${label}: ${t.toFixed(4)}s`, x+8*DPR, 4*DPR);
+      ctx.restore();
+    };
+    drawOne(state.markerA, 'A', '#80ffea');
+    drawOne(state.markerB, 'B', '#a8e6ff');
+  }
+  function drawDragSelection(ctx){
+    if(!state.dragging) return;
+    const x1=Math.min(state.dragStartX,state.dragEndX);
+    const x2=Math.max(state.dragStartX,state.dragEndX);
+    ctx.save();
+    ctx.fillStyle='rgba(129,236,236,0.15)';
+    ctx.fillRect(x1,0,x2-x1,state.h);
+    ctx.strokeStyle='rgba(129,236,236,0.9)'; ctx.lineWidth=2;
+    ctx.strokeRect(x1+0.5,0.5,x2-x1-1,state.h-1);
+    ctx.restore();
+  }
+
+  // Render loop
+  function renderLoop(){
+    const ctx = els.canvas.getContext('2d');
+    const w=state.w, h=state.h;
+
+    function drawRealtimeTime(){
+      state.analyser.getFloatTimeDomainData(state.dataTime);
+      let arr = state.dataTime;
+      if(els.chkAutoNorm.checked){
+        let max=0; for(let i=0;i<arr.length;i++){ const a=Math.abs(arr[i]); if(a>max) max=a; }
+        if(max>1e-6){ const scale=1/max; const tmp=new Float32Array(arr.length); for(let i=0;i<arr.length;i++) tmp[i]=arr[i]*scale; arr=tmp; }
+      }
+      ctx.beginPath();
+      const mid=h/2; const scaleY=h*0.42*state.gain;
+      for(let i=0;i<arr.length;i++){
+        const v=Math.max(-1,Math.min(1,arr[i]));
+        const x=i/arr.length*w;
+        const y=mid+v*scaleY;
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      const grad=ctx.createLinearGradient(0,0,w,0); grad.addColorStop(0,'#4dd0e1'); grad.addColorStop(1,'#7c4dff');
+      ctx.strokeStyle=grad; ctx.lineWidth=Math.max(1,2*DPR); ctx.shadowColor='rgba(77,208,225,0.35)'; ctx.shadowBlur=8; ctx.stroke(); ctx.shadowBlur=0;
+      drawAxes(ctx,{mode:'time', spanSec: state.timeSpanSec});
+      drawMarkers(ctx, state.timeSpanSec);
+    }
+    function drawRealtimeFFT(){
+      state.analyser.getByteFrequencyData(state.dataFreq);
+      const bins=state.dataFreq.length;
+      const barW=Math.max(1, (w/bins));
+      for(let i=0;i<bins;i++){
+        const mag=state.dataFreq[i]/255;
+        const barH=mag*(h*0.9);
+        const x=i*barW; const y=h-barH;
+        const hue=180+120*mag;
+        ctx.fillStyle=`hsl(${hue} 70% 60% / 0.9)`;
+        ctx.fillRect(x,y,barW-0.5,barH);
+      }
+      drawAxes(ctx,{mode:'freq', nyquist: (state.ctx? state.ctx.sampleRate/2 : 22050)});
+    }
+
+    function drawRecordedTime(){
+      const full = state.recVisSamples;
+      if(!full || full.length===0){ return drawNoData(); }
+      const [a,b]=state.tZoom; const ia=Math.floor(a*full.length), ib=Math.max(ia+1, Math.floor(b*full.length));
+      let arr = full.subarray(ia, ib);
+      if(els.chkAutoNorm.checked){
+        let max=0; for(let i=0;i<arr.length;i++){ const m=Math.abs(arr[i]); if(m>max) max=m; }
+        if(max>1e-6){ const scale=1/max; const tmp=new Float32Array(arr.length); for(let i=0;i<arr.length;i++) tmp[i]=arr[i]*scale; arr=tmp; }
+      }
+      ctx.beginPath();
+      const mid=h/2; const scaleY=h*0.42*state.gain;
+      for(let i=0;i<arr.length;i++){
+        const x=i/arr.length*w;
+        const y=mid + Math.max(-1,Math.min(1,arr[i]))*scaleY;
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.strokeStyle='#d0f6ff'; ctx.lineWidth=Math.max(1,2*DPR); ctx.stroke();
+      const spanSec = (arr.length/state.recSR); // ズーム範囲の時間幅
+      drawAxes(ctx,{mode:'time', spanSec});
+      drawMarkers(ctx, spanSec);
+    }
+    function drawRecordedFFT(){
+      const full = state.recVisSamples;
+      if(!full || full.length===0){ return drawNoData(); }
+      const [a,b]=state.tZoom;
+      const ia=Math.floor(a*full.length), ib=Math.max(ia+1, Math.floor(b*full.length));
+      const segment = full.subarray(ia, ib);
+      // Hann window
+      const N = segment.length; const seg = new Float32Array(N);
+      for(let i=0;i<N;i++){ const wH=0.5 - 0.5*Math.cos(2*Math.PI*i/(N-1)); seg[i]=segment[i]*wH; }
+      const mags = fftMag(seg);
+      const bins=mags.length;
+      let maxMag=1e-9; for(let i=0;i<bins;i++){ if(mags[i]>maxMag) maxMag=mags[i]; }
+      const barW=Math.max(1,(w/bins));
+      for(let i=0;i<bins;i++){
+        const mag=mags[i]/maxMag;
+        const barH=mag*(h*0.9);
+        const x=i*barW; const y=h-barH;
+        const hue=180+120*mag;
+        ctx.fillStyle=`hsl(${hue} 70% 60% / 0.9)`;
+        ctx.fillRect(x,y,barW-0.5,barH);
+      }
+      const nyquist = state.recSR/2;
+      drawAxes(ctx,{mode:'freq', nyquist});
+    }
+
+    function drawNoData(){
+      ctx.fillStyle='rgba(255,255,255,0.5)';
+      ctx.font=`${14*DPR}px system-ui`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('録音結果がありません', w/2, h/2);
+    }
+
+    function loop(){
+      const ctx2 = els.canvas.getContext('2d');
+      drawGrid(ctx2);
+
+      if(els.chkShowRec.checked){
+        if(state.view==='time') drawRecordedTime(); else drawRecordedFFT();
+        drawDragSelection(ctx2);
+      }else{
+        if(!state.analyser){ requestAnimationFrame(loop); return; }
+        if(state.view==='time') drawRealtimeTime(); else drawRealtimeFFT();
+        if(state.recording){
+          state.analyser.getFloatTimeDomainData(state.dataTime);
+          appendRecVis(state.dataTime);
+        }
+      }
+      requestAnimationFrame(loop);
+    }
+    loop();
+  }
+
+  // ====== 操作（左クリック＝常にマーカー／右ドラッグ＝ズーム） ======
+  // 左クリック → マーカー（リアルタイムWaveform ＆ 録音結果Waveform の両方）
+  els.canvas.addEventListener('mousedown', (ev)=>{
+    if(ev.button===0){
+      if(state.view!=='time') return;
+      const rect = els.canvas.getBoundingClientRect();
+      const x = (ev.clientX - rect.left) * DPR;
+      let tSec;
+      if(els.chkShowRec.checked){
+        const [a,b]=state.tZoom;
+        const totalSec = state.recVisSamples.length / state.recSR;
+        const startSec = totalSec * a;
+        const spanSec = totalSec * (b-a);
+        tSec = startSec + (x/state.w) * spanSec;
+      }else{
+        tSec = (x / state.w) * state.timeSpanSec;
+      }
+      placeMarker(tSec);
+    }
+    // 右ボタンでズーム開始（録音結果モードのみ）
+    if(ev.button===2){
+      if(!els.chkShowRec.checked) return;
+      state.dragging=true; state.dragMoved=false;
+      const rect=els.canvas.getBoundingClientRect();
+      state.dragStartX = (ev.clientX - rect.left) * DPR;
+      state.dragEndX = state.dragStartX;
+    }
+  });
+  els.canvas.addEventListener('mousemove', (ev)=>{
+    if(!state.dragging) return;
+    const rect=els.canvas.getBoundingClientRect();
+    state.dragEndX = (ev.clientX - rect.left) * DPR;
+    if(Math.abs(state.dragEndX - state.dragStartX) > 3) state.dragMoved = true;
+  });
+  function applyZoomFromDrag(){
+    const x1=Math.min(state.dragStartX,state.dragEndX);
+    const x2=Math.max(state.dragStartX,state.dragEndX);
+    const minSel = 6*DPR;
+    if(x2-x1 < minSel){ state.dragging=false; return false; }
+    const a = x1/state.w, b = x2/state.w;
+    state.tZoom=[
+      state.tZoom[0] + a*(state.tZoom[1]-state.tZoom[0]),
+      state.tZoom[0] + b*(state.tZoom[1]-state.tZoom[0])
+    ];
+    state.dragging=false;
+    return true;
+  }
+  // 右ボタン離し：ドラッグしていればズーム確定、ドラッグしていなければズーム解除
+  els.canvas.addEventListener('mouseup', (ev)=>{
+    if(ev.button!==2) return;
+    if(!els.chkShowRec.checked) return;
+    const moved = state.dragMoved;
+    if(state.dragging){ applyZoomFromDrag(); }
+    state.dragging=false; state.dragMoved=false;
+    if(!moved){
+      // 右クリック単押し＝ズーム解除
+      state.tZoom=[0,1];
+    }
+  });
+  // コンテキストメニュー抑止
+  els.canvas.addEventListener('contextmenu', (e)=>e.preventDefault());
+  // ダブルクリック：ズーム＆マーカーリセット（Waveform時）
+  els.canvas.addEventListener('dblclick', ()=>{
+    if(els.chkShowRec.checked){ state.tZoom=[0,1]; }
+    if(state.view==='time'){
+      state.markerA=state.markerB=null; els.markA.value=els.markB.value='—'; els.deltaT.value='—'; els.speed.value='— m/s';
+    }
+  });
+
+  function placeMarker(tSec){
+    if(state.markerA==null){ state.markerA=tSec; els.markA.value=tSec.toFixed(4); }
+    else if(state.markerB==null){ state.markerB=tSec; els.markB.value=tSec.toFixed(4); }
+    else{
+      const dA=Math.abs(tSec-state.markerA), dB=Math.abs(tSec-state.markerB);
+      if(dA<dB){ state.markerA=tSec; els.markA.value=tSec.toFixed(4); }
+      else{ state.markerB=tSec; els.markB.value=tSec.toFixed(4); }
+    }
+    const dt=(state.markerA!=null && state.markerB!=null) ? Math.abs(state.markerB-state.markerA) : null;
+    els.deltaT.value = dt!=null ? dt.toFixed(6) : '—';
+  }
+
+  // Bindings
+  document.getElementById('btnWave').addEventListener('click', ()=>{ state.view='time'; btnSel('btnWave','btnFFT'); });
+  document.getElementById('btnFFT').addEventListener('click',  ()=>{ state.view='fft';  btnSel('btnFFT','btnWave'); });
+  function btnSel(on,off){ document.getElementById(on).classList.add('btn-primary'); document.getElementById(off).classList.remove('btn-primary'); }
+  document.getElementById('btnFull').addEventListener('click', ()=>{ const el=document.documentElement; !document.fullscreenElement ? el.requestFullscreen?.() : document.exitFullscreen?.(); });
+  document.getElementById('rangeGain').addEventListener('input', e=>{ const v=parseFloat(e.target.value); if(!isFinite(v))return; if(state.gainNode) state.gainNode.gain.value=v; state.gain=v; });
+  document.getElementById('rangeTime').addEventListener('input', e=>{ const v=parseFloat(e.target.value); if(!isFinite(v))return; state.timeSpanSec=v; });
+  document.getElementById('btnRec').addEventListener('click', ()=>{ state.recording? stopRec() : startRec(); });
+  document.getElementById('btnSave').addEventListener('click', saveAudio);
+  document.getElementById('btnPulse').addEventListener('click', ()=> playStimulus('pulse', parseInt(els.impMs.value||'20',10), parseFloat(els.impGain.value||'0.9')) );
+  document.getElementById('btnNoise').addEventListener('click', ()=> playStimulus('noise', parseInt(els.impMs.value||'20',10), parseFloat(els.impGain.value||'0.9')) );
+  document.getElementById('btnCombo').addEventListener('click', comboRecordPlay);
+  document.getElementById('btnCalc').addEventListener('click', ()=>{
+    const dt = parseFloat(els.deltaT.value);
+    if(!isFinite(dt) || dt<=0){ els.speed.value='— m/s'; return; }
+    const L=parseFloat(els.distance.value||'0'); const m=parseFloat(els.mult.value||'1');
+    const v=(L*m)/dt; els.speed.value=v.toFixed(2)+' m/s';
+  });
+  document.getElementById('selDevice').addEventListener('change', e=>{ state.deviceId=e.target.value; if(state.mediaStream) startMic(); });
+  document.getElementById('btnRefresh').addEventListener('click', listDevices);
+
+  window.addEventListener('keydown', (e)=>{
+    if(e.target && ['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+    if(e.code==='Space'){ e.preventDefault(); state.mediaStream? stopMic() : startMic(); }
+    if(e.key==='r' || e.key==='R'){ e.preventDefault(); state.recording? stopRec() : startRec(); }
+    if(e.key==='t' || e.key==='T'){ e.preventDefault(); document.getElementById('btnWave').click(); }
+    if(e.key==='f' || e.key==='F'){ e.preventDefault(); document.getElementById('btnFFT').click(); }
+  });
+
+  // init
+  listDevices();
+  startMic();
+  log('準備完了：左クリック＝マーカー（ズーム中もOK）、右ドラッグ＝ズーム、右クリック単押し/ダブルクリック＝ズーム解除。');
+})();</script>
+</body>
+</html>
