@@ -3,18 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Oscillo Lab — 完全版（オシレーター同時記録統合）</title>
+  <title>Oscillo Lab.</title>
   <style>
     :root{
       --bg:#0c0f14; --panel:#121722; --panel-2:#0f1420; --brand:#4dd0e1; --accent:#7c4dff;
-      --text:#ffffff; --muted:#eeeeee;
+      --text:#ffffff; --muted:#dfe6ee;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{margin:0;background:radial-gradient(1200px 800px at 70% -10%,#1c2435 0%,#0c0f14 60%);color:var(--text);
-         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Noto Sans JP",sans-serif;letter-spacing:.02em;display:flex}
-    #sidebar{width:380px;background:linear-gradient(180deg,#0d121c,#0a0e15);border-right:1px solid #1b2637;padding:12px;overflow:auto}
-    #main{flex:1;display:flex;flex-direction:column}
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Noto Sans JP",sans-serif;letter-spacing:.02em;display:flex;flex-direction:column}
+    #app{display:flex;min-height:0;flex:1}
+    #sidebar{width:390px;background:linear-gradient(180deg,#0d121c,#0a0e15);border-right:1px solid #1b2637;padding:12px;overflow:auto}
+    #main{flex:1;display:flex;flex-direction:column;min-width:0}
     header{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #1b2637}
     header .title{font-weight:800;letter-spacing:.05em}
     header .right{display:flex;gap:8px;align-items:center}
@@ -33,35 +34,85 @@
     #log{font-size:12px;background:#000;border:1px solid #1b2637;border-radius:10px;padding:8px;max-height:140px;overflow:auto;color:#0f0}
     .muted{opacity:.85}
     .hide{display:none}
+    footer{border-top:1px solid #1b2637;padding:8px 12px;text-align:right;color:#cfd6e6;opacity:.8}
   </style>
 </head>
 <body>
-  <div id="sidebar">
-    <div class="card">
-      <h3>🎤 録音＋発音（同時記録）</h3>
-      <div class="row">
-        <label>種類</label>
-        <select id="comboType">
-          <option value="pulse">理想パルス</option>
-          <option value="noise">短いホワイトノイズ</option>
-          <option value="osc">オシレーター</option>
-        </select>
+  <div id="app">
+    <div id="sidebar">
+      <div class="card">
+        <h3>🎤 録音＋発音（同時記録）</h3>
+        <div class="row">
+          <label>種類</label>
+          <select id="comboType">
+            <option value="pulse">理想パルス</option>
+            <option value="noise">短いホワイトノイズ</option>
+            <option value="osc">オシレーター</option>
+          </select>
+        </div>
+        <div class="row combo-common">
+          <label>発音長さ(ms)</label>
+          <input id="comboDurMs" type="number" value="200" step="1" min="1">
+          <label>音量</label>
+          <input id="comboGain" type="range" min="0" max="1" step="0.01" value="0.9">
+        </div>
+        <div id="comboOscPanel" class="card">
+          <h3 style="border:none;margin:0 0 6px 0;padding:0;">⚙ オシレーター設定</h3>
+          <div class="row">
+            <label>波形</label>
+            <select id="comboOscWave">
+              <option value="sine" selected>正弦波</option>
+              <option value="square">矩形波</option>
+              <option value="triangle">三角波</option>
+              <option value="sawtooth">のこぎり波</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>周波数(100–1000Hz)</label>
+            <input type="range" id="comboOscFreqSlider" min="100" max="1000" step="1" value="440">
+            <input type="number" id="comboOscFreqInput" value="440" step="1" style="width:90px">
+          </div>
+        </div>
+        <div class="row">
+          <label>事前待機(ms)</label>
+          <input id="comboPreMs" type="number" value="200" step="10" min="0">
+          <label>事後(ms)</label>
+          <input id="comboPostMs" type="number" value="500" step="10" min="0">
+        </div>
+        <div class="row">
+          <button id="btnCombo" class="btn-primary">▶ 録音→発音→停止</button>
+        </div>
+        <div class="row">
+          <label><input id="chkShowRec" type="checkbox"> 録音結果を表示</label>
+        </div>
+        <div class="small">左クリック＝マーカー／右ドラッグ＝ズーム／右クリックorダブルクリック＝ズーム解除。軸はズームに追従。</div>
       </div>
 
-      <!-- パルス/ノイズ 共通 -->
-      <div class="row combo-common">
-        <label>発音長さ(ms)</label>
-        <input id="comboDurMs" type="number" value="200" step="1" min="1">
-        <label>音量</label>
-        <input id="comboGain" type="range" min="0" max="1" step="0.01" value="0.9">
+      <div class="card">
+        <h3>🔴 録音（手動）</h3>
+        <div class="row">
+          <button id="btnRec">⏺ Start</button>
+          <button id="btnSave" disabled>💾 Save</button>
+        </div>
       </div>
 
-      <!-- オシレーター詳細 -->
-      <div id="comboOscPanel" class="card muted">
-        <h3 style="border:none;margin:0 0 6px 0;padding:0;">⚙ オシレーター設定</h3>
+      <div class="card">
+        <h3>🔊 発音（単独）</h3>
+        <div class="row">
+          <button id="btnPulse">Pulse</button>
+          <button id="btnNoise">Noise</button>
+        </div>
+        <div class="row">
+          <label>長さ(ms)</label><input id="impMs" type="number" value="20" step="1" min="1">
+          <label>音量</label><input id="impGain" type="range" min="0" max="1" step="0.05" value="0.9">
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🎵 オシレーター（単独）</h3>
         <div class="row">
           <label>波形</label>
-          <select id="comboOscWave">
+          <select id="oscWave">
             <option value="sine" selected>正弦波</option>
             <option value="square">矩形波</option>
             <option value="triangle">三角波</option>
@@ -70,143 +121,112 @@
         </div>
         <div class="row">
           <label>周波数(100–1000Hz)</label>
-          <input type="range" id="comboOscFreqSlider" min="100" max="1000" step="1" value="440">
-          <input type="number" id="comboOscFreqInput" value="440" step="1" style="width:90px">
+          <input type="range" id="oscFreqSlider" min="100" max="1000" step="1" value="440">
+          <input type="number" id="oscFreqInput" value="440" step="1" style="width:90px">
+        </div>
+        <div class="row">
+          <label>音量</label>
+          <input type="range" id="oscGain" min="0" max="1" step="0.01" value="0.5">
+        </div>
+        <div class="row">
+          <button id="btnOscStart" class="btn-primary">▶ Start</button>
+          <button id="btnOscStop">⏹ Stop</button>
         </div>
       </div>
 
-      <div class="row">
-        <label>事前待機(ms)</label>
-        <input id="comboPreMs" type="number" value="200" step="10" min="0">
-        <label>事後(ms)</label>
-        <input id="comboPostMs" type="number" value="500" step="10" min="0">
+      <div class="card">
+        <h3>表示 / スケール</h3>
+        <div class="row">
+          <button id="btnWave" class="btn-primary">Waveform</button>
+          <button id="btnFFT">FFT</button>
+          <button id="btnFull">⤢ Fullscreen</button>
+        </div>
+        <div class="row">
+          <label><input id="chkAxes" type="checkbox" checked> 軸表示</label>
+          <!-- 正規化はデフォルトON -->
+          <label><input id="chkAutoNorm" type="checkbox" checked> 波形を自動正規化</label>
+        </div>
+        <div class="row">
+          <label>入力ゲイン</label><input id="rangeGain" type="range" min="0.2" max="5" value="1" step="0.1">
+        </div>
+        <div class="row">
+          <label>表示スケール（最大値）</label>
+          <input id="displayMax" type="range" min="0.1" max="2.0" step="0.05" value="1.0">
+          <span class="small" id="displayMaxLabel">1.00</span>
+        </div>
+        <div class="row">
+          <label>時間窓(秒)</label><input id="rangeTime" type="range" min="0.02" max="0.5" value="0.25" step="0.01">
+        </div>
       </div>
-      <div class="row">
-        <button id="btnCombo" class="btn-primary">▶ 録音→発音→停止</button>
+
+      <div class="card">
+        <h3>⏱ トリガー（周期固定＋平均）</h3>
+        <div class="row">
+          <label><input id="chkTrigger" type="checkbox"> トリガーモード</label>
+        </div>
+        <div class="row">
+          <label>トリガーレベル</label>
+          <input id="triggerLevel" type="range" min="-1" max="1" step="0.01" value="0">
+          <span class="small" id="triggerLabel">0.00</span>
+        </div>
+        <div class="row">
+          <label>平均化周期数</label>
+          <input id="avgCycles" type="range" min="1" max="10" step="1" value="1">
+          <span class="small" id="avgLabel">1 周期</span>
+        </div>
+        <div class="small">上昇エッジ基準で位相固定。平均化でノイズ低減。</div>
       </div>
-      <div class="row">
-        <label><input id="chkShowRec" type="checkbox"> 録音結果を表示</label>
+
+      <div class="card">
+        <h3>📏 マーカー計測（音速）</h3>
+        <div class="row">
+          <span class="small">Waveform表示時：左クリックで A/B。ダブルクリックでリセット。</span>
+        </div>
+        <div class="row">
+          <label>A(s)</label><input id="markA" type="text" readonly value="—">
+          <label>B(s)</label><input id="markB" type="text" readonly value="—">
+          <label>Δt</label><input id="deltaT" type="text" readonly value="—">
+        </div>
+        <div class="row">
+          <label>距離 L(m)</label><input id="distance" type="number" value="2.0" step="0.1">
+          <label>往復倍率</label>
+          <select id="mult">
+            <option value="1">×1</option>
+            <option value="2" selected>×2</option>
+            <option value="4">×4</option>
+          </select>
+        </div>
+        <div class="row">
+          <button id="btnCalc" class="btn-primary">速度 v = 距離/Δt</button>
+        </div>
+        <div class="row">
+          <input id="speed" type="text" readonly value="— m/s">
+        </div>
       </div>
-      <div class="small">左クリック＝マーカー／右ドラッグ＝ズーム／右クリック単押しorダブルクリック＝ズーム解除。軸はズームに追従。</div>
+
+      <div class="card">
+        <h3>🎙 入力デバイス</h3>
+        <div class="row">
+          <select id="selDevice"></select><button id="btnRefresh">⟳</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>📝 ログ</h3>
+        <div id="log"></div>
+      </div>
+
     </div>
 
-    <div class="card">
-      <h3>🔴 録音（手動）</h3>
-      <div class="row">
-        <button id="btnRec">⏺ Start</button>
-        <button id="btnSave" disabled>💾 Save</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>🔊 発音（単独）</h3>
-      <div class="row">
-        <button id="btnPulse">Pulse</button>
-        <button id="btnNoise">Noise</button>
-      </div>
-      <div class="row">
-        <label>長さ(ms)</label><input id="impMs" type="number" value="20" step="1" min="1">
-        <label>音量</label><input id="impGain" type="range" min="0" max="1" step="0.05" value="0.9">
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>🎵 オシレーター（単独）</h3>
-      <div class="row">
-        <label>波形</label>
-        <select id="oscWave">
-          <option value="sine" selected>正弦波</option>
-          <option value="square">矩形波</option>
-          <option value="triangle">三角波</option>
-          <option value="sawtooth">のこぎり波</option>
-        </select>
-      </div>
-      <div class="row">
-        <label>周波数(100–1000Hz)</label>
-        <input type="range" id="oscFreqSlider" min="100" max="1000" step="1" value="440">
-        <input type="number" id="oscFreqInput" value="440" step="1" style="width:90px">
-      </div>
-      <div class="row">
-        <label>音量</label>
-        <input type="range" id="oscGain" min="0" max="1" step="0.01" value="0.5">
-      </div>
-      <div class="row">
-        <button id="btnOscStart" class="btn-primary">▶ Start</button>
-        <button id="btnOscStop">⏹ Stop</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>表示 / スケール</h3>
-      <div class="row">
-        <button id="btnWave" class="btn-primary">Waveform</button>
-        <button id="btnFFT">FFT</button>
-        <button id="btnFull">⤢ Fullscreen</button>
-      </div>
-      <div class="row">
-        <label><input id="chkAxes" type="checkbox" checked> 軸表示</label>
-        <label><input id="chkAutoNorm" type="checkbox" checked> 波形を自動正規化</label>
-      </div>
-      <div class="row">
-        <label>感度</label><input id="rangeGain" type="range" min="0.2" max="5" value="1" step="0.1">
-        <label>時間窓(秒)</label><input id="rangeTime" type="range" min="0.02" max="0.5" value="0.25" step="0.01">
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>📏 マーカー計測（音速）</h3>
-      <div class="row">
-        <span class="small">Waveform表示時：左クリックで A/B。ダブルクリックでリセット。</span>
-      </div>
-      <div class="row">
-        <label>A(s)</label><input id="markA" type="text" readonly value="—">
-        <label>B(s)</label><input id="markB" type="text" readonly value="—">
-        <label>Δt</label><input id="deltaT" type="text" readonly value="—">
-      </div>
-      <div class="row">
-        <label>距離 L(m)</label><input id="distance" type="number" value="2.0" step="0.1">
-        <label>往復倍率</label>
-        <select id="mult">
-          <option value="1">×1</option>
-          <option value="2" selected>×2</option>
-          <option value="4">×4</option>
-        </select>
-      </div>
-      <div class="row">
-        <button id="btnCalc" class="btn-primary">速度 v = 距離/Δt</button>
-      </div>
-      <div class="row">
-        <input id="speed" type="text" readonly value="— m/s">
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>🎙 入力デバイス</h3>
-      <div class="row">
-        <select id="selDevice"></select><button id="btnRefresh">⟳</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>📝 ログ</h3>
-      <div id="log"></div>
-    </div>
-
-    <div class="card">
-      <h3>⌨️ ショートカット</h3>
-      <div class="small">
-        Space: マイク開始/停止 / R: 録音 / T: 波形 / F: FFT
-      </div>
+    <div id="main">
+      <header>
+        <div class="title">Oscillo Lab.</div>
+        <div class="right">SR: <span id="sr">—</span> Hz · FFT: <span id="fftSz">—</span></div>
+      </header>
+      <canvas id="scope"></canvas>
     </div>
   </div>
-
-  <div id="main">
-    <header>
-      <div class="title">Oscillo Lab — 完全版</div>
-      <div class="right">SR: <span id="sr">—</span> Hz · FFT: <span id="fftSz">—</span></div>
-    </header>
-    <canvas id="scope"></canvas>
-  </div>
+  <footer>Design by ODA Tomohiro</footer>
 
 <script>
 (()=>{
@@ -224,6 +244,14 @@
     chkShowRec: document.getElementById('chkShowRec'),
     rangeGain: document.getElementById('rangeGain'),
     rangeTime: document.getElementById('rangeTime'),
+    displayMax: document.getElementById('displayMax'),
+    displayMaxLabel: document.getElementById('displayMaxLabel'),
+    // trigger
+    chkTrigger: document.getElementById('chkTrigger'),
+    triggerLevel: document.getElementById('triggerLevel'),
+    triggerLabel: document.getElementById('triggerLabel'),
+    avgCycles: document.getElementById('avgCycles'),
+    avgLabel: document.getElementById('avgLabel'),
     // record
     btnRec: document.getElementById('btnRec'),
     btnSave: document.getElementById('btnSave'),
@@ -275,6 +303,7 @@
     view: 'time', // 'time' | 'fft'
     timeSpanSec: parseFloat(els.rangeTime.value),
     gain: parseFloat(els.rangeGain.value),
+    displayMax: parseFloat(els.displayMax.value), // 振幅の最大値（±displayMaxが画面上下に収まる）
     fftSize: 2048,
     dataTime: null,
     dataFreq: null,
@@ -290,7 +319,9 @@
     // right-drag zoom handling
     dragging: false, dragStartX: 0, dragEndX: 0, dragMoved: false,
     // standalone oscillator
-    oscNode: null, oscGainNode: null
+    oscNode: null, oscGainNode: null,
+    // fft cursor
+    cursorX: null
   };
 
   function log(m){ const d=document.createElement('div'); d.textContent='• '+m; els.log.prepend(d); }
@@ -298,7 +329,7 @@
   // Canvas sizing
   function fitCanvas(){
     state.w = Math.floor(els.canvas.clientWidth * DPR);
-    state.h = Math.floor((window.innerHeight - 48) * DPR);
+    state.h = Math.floor((window.innerHeight - 48 - 34) * DPR);
     els.canvas.width = state.w; els.canvas.height = state.h;
     els.canvas.style.width = '100%'; els.canvas.style.height = (state.h/DPR)+'px';
   }
@@ -458,9 +489,9 @@
     state.recVisSamples = merged;
   }
 
-  // FFT (simple radix-2, for recorded FFT)
+  // FFT
   function nextPow2(n){ let p=1; while(p<n) p<<=1; return p; }
-  function fftMag(input){
+  function fftMag(input, sampleRate){
     const N = nextPow2(input.length);
     const re = new Float32Array(N);
     const im = new Float32Array(N);
@@ -491,7 +522,47 @@
     }
     const mags = new Float32Array(N/2);
     for(let i=0;i<N/2;i++){ mags[i] = Math.sqrt(re[i]*re[i] + im[i]*im[i]) / (N/2); }
-    return mags;
+    // peak estimate
+    let peak=0, idx=0;
+    for(let i=1;i<mags.length;i++){ if(mags[i]>peak){ peak=mags[i]; idx=i; } }
+    const freq = (idx * sampleRate) / N;
+    return {mags, freq};
+  }
+
+  // Trigger utility: rotate array so that first rising crossing at level becomes index 0
+  function rotateAtTrigger(arr, level){
+    const N = arr.length;
+    for(let i=0;i<N-1;i++){
+      const a = arr[i], b = arr[i+1];
+      if(a < level && b >= level){
+        const out = new Float32Array(N);
+        let k=0;
+        for(let j=i; j<N; j++,k++) out[k]=arr[j];
+        for(let j=0; j<i; j++,k++) out[k]=arr[j];
+        return out;
+      }
+    }
+    return arr; // no crossing found
+  }
+
+  // Average N cycles using estimated period from FFT peak
+  function averageCycles(arr, sampleRate, cycles){
+    if(cycles<=1) return arr;
+    const {freq} = fftMag(arr, sampleRate);
+    if(!isFinite(freq) || freq<=0) return arr;
+    const period = Math.max(8, Math.round(sampleRate / freq)); // in samples
+    const total = Math.min(arr.length, period * cycles);
+    const buf = arr.subarray(0, total);
+    const out = new Float32Array(period);
+    let count = Math.floor(total / period);
+    if(count<1) return arr;
+    for(let c=0;c<count;c++){
+      for(let i=0;i<period;i++){
+        out[i] += buf[c*period + i];
+      }
+    }
+    for(let i=0;i<period;i++) out[i] /= count;
+    return out;
   }
 
   // Drawing helpers
@@ -570,31 +641,86 @@
     const ctx = els.canvas.getContext('2d');
     const w=state.w, h=state.h;
 
-    function drawRealtimeTime(){
-      state.analyser.getFloatTimeDomainData(state.dataTime);
-      let arr = state.dataTime;
+    function scaleSegment(seg, sampleRate){
+      let a = seg;
       if(els.chkAutoNorm.checked){
-        let max=0; for(let i=0;i<arr.length;i++){ const a=Math.abs(arr[i]); if(a>max) max=a; }
-        if(max>1e-6){ const scale=1/max; const tmp=new Float32Array(arr.length); for(let i=0;i<arr.length;i++) tmp[i]=arr[i]*scale; arr=tmp; }
+        let max=0; for(let i=0;i<a.length;i++){ const m=Math.abs(a[i]); if(m>max) max=m; }
+        if(max>1e-6){ const s=1/max; const t=new Float32Array(a.length); for(let i=0;i<a.length;i++) t[i]=a[i]*s; a=t; }
+      }else{
+        const dmax = state.displayMax>1e-6 ? state.displayMax : 1.0;
+        const t=new Float32Array(a.length); for(let i=0;i<a.length;i++) t[i]=a[i]/dmax; a=t;
       }
-      ctx.beginPath();
+      if(els.chkTrigger.checked){
+        const lvl = parseFloat(els.triggerLevel.value)||0;
+        a = rotateAtTrigger(a, lvl);
+        const cycles = parseInt(els.avgCycles.value||'1',10);
+        if(cycles>1){
+          a = averageCycles(a, sampleRate, cycles);
+        }
+      }
+      return a;
+    }
+
+    function drawTimeFromArray(arr, sampleRate, spanSec){
+      let a = arr;
       const mid=h/2; const scaleY=h*0.42*state.gain;
-      for(let i=0;i<arr.length;i++){
-        const v=Math.max(-1,Math.min(1,arr[i]));
-        const x=i/arr.length*w;
-        const y=mid+v*scaleY;
+      ctx.beginPath();
+      for(let i=0;i<a.length;i++){
+        const x=i/a.length*w;
+        const y=mid + Math.max(-1,Math.min(1,a[i]))*scaleY;
         if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
       }
-      ctx.strokeStyle='#fff'; ctx.lineWidth=Math.max(1,2*DPR); ctx.stroke();
-      drawAxes(ctx,{mode:'time', spanSec: state.timeSpanSec});
-      drawMarkers(ctx, state.timeSpanSec);
+      ctx.strokeStyle='#ffffff'; ctx.lineWidth=Math.max(1,2*DPR); ctx.stroke();
+      const shownSec = spanSec || (a.length/sampleRate);
+      drawAxes(ctx,{mode:'time', spanSec: shownSec});
+      drawMarkers(ctx, shownSec);
     }
+
+    function drawRealtimeTime(){
+      state.analyser.getFloatTimeDomainData(state.dataTime);
+      let seg = state.dataTime;
+      // crop to visible time window
+      const need = Math.floor(state.timeSpanSec * state.ctx.sampleRate);
+      if(need < seg.length){
+        seg = seg.subarray(seg.length-need);
+      }
+      seg = scaleSegment(seg, state.ctx.sampleRate);
+      drawTimeFromArray(seg, state.ctx.sampleRate, seg.length/state.ctx.sampleRate);
+    }
+
+    function drawFFTCursorOverlay(sampleRate, bins, getMag){
+      if(state.cursorX==null) return;
+      const w=state.w, h=state.h;
+      const x = Math.max(0, Math.min(w-1, state.cursorX));
+      const bin = Math.max(0, Math.min(bins-1, Math.round((x/w) * (bins-1))));
+      const nyq = sampleRate/2;
+      const freq = (bin / (bins-1)) * nyq;
+      const mag = getMag(bin); // 0..1
+      // vertical line
+      ctx.save();
+      ctx.strokeStyle='rgba(255,255,255,0.75)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+      // label
+      const text = `${freq.toFixed(1)} Hz  |  ${Math.round(mag*100)} %`;
+      const pad=6; ctx.font=`${12*DPR}px system-ui`; const tw=ctx.measureText(text).width+pad*2;
+      const th=18*DPR;
+      let bx = Math.min(Math.max(4*DPR, x - tw/2), w - tw - 4*DPR);
+      let by = 6*DPR;
+      ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(bx, by, tw, th);
+      ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.strokeRect(bx+0.5, by+0.5, tw-1, th-1);
+      ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(text, bx+tw/2, by+th/2+1);
+      ctx.restore();
+    }
+
     function drawRealtimeFFT(){
       state.analyser.getByteFrequencyData(state.dataFreq);
       const bins=state.dataFreq.length;
       const barW=Math.max(1, (w/bins));
+      let maxV = 1;
+      for(let i=0;i<bins;i++){ if(state.dataFreq[i]>maxV) maxV=state.dataFreq[i]; }
       for(let i=0;i<bins;i++){
-        const mag=state.dataFreq[i]/255;
+        const mag=state.dataFreq[i]/maxV;
         const barH=mag*(h*0.9);
         const x=i*barW; const y=h-barH;
         const hue=180+120*mag;
@@ -602,28 +728,16 @@
         ctx.fillRect(x,y,barW-0.5,barH);
       }
       drawAxes(ctx,{mode:'freq', nyquist: (state.ctx? state.ctx.sampleRate/2 : 22050)});
+      drawFFTCursorOverlay(state.ctx.sampleRate, bins, (i)=> state.dataFreq[i]/maxV );
     }
 
     function drawRecordedTime(){
       const full = state.recVisSamples;
       if(!full || full.length===0){ return drawNoData(); }
       const [a,b]=state.tZoom; const ia=Math.floor(a*full.length), ib=Math.max(ia+1, Math.floor(b*full.length));
-      let arr = full.subarray(ia, ib);
-      if(els.chkAutoNorm.checked){
-        let max=0; for(let i=0;i<arr.length;i++){ const m=Math.abs(arr[i]); if(m>max) max=m; }
-        if(max>1e-6){ const scale=1/max; const tmp=new Float32Array(arr.length); for(let i=0;i<arr.length;i++) tmp[i]=arr[i]*scale; arr=tmp; }
-      }
-      ctx.beginPath();
-      const mid=h/2; const scaleY=h*0.42*state.gain;
-      for(let i=0;i<arr.length;i++){
-        const x=i/arr.length*w;
-        const y=mid + Math.max(-1,Math.min(1,arr[i]))*scaleY;
-        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-      }
-      ctx.strokeStyle='#ffffff'; ctx.lineWidth=Math.max(1,2*DPR); ctx.stroke();
-      const spanSec = (arr.length/state.recSR);
-      drawAxes(ctx,{mode:'time', spanSec});
-      drawMarkers(ctx, spanSec);
+      let seg = full.subarray(ia, ib);
+      seg = scaleSegment(seg, state.recSR);
+      drawTimeFromArray(seg, state.recSR, seg.length/state.recSR);
     }
     function drawRecordedFFT(){
       const full = state.recVisSamples;
@@ -631,10 +745,9 @@
       const [a,b]=state.tZoom;
       const ia=Math.floor(a*full.length), ib=Math.max(ia+1, Math.floor(b*full.length));
       const segment = full.subarray(ia, ib);
-      // Hann window
-      const N = segment.length; const seg = new Float32Array(N);
-      for(let i=0;i<N;i++){ const wH=0.5 - 0.5*Math.cos(2*Math.PI*i/(N-1)); seg[i]=segment[i]*wH; }
-      const mags = fftMag(seg);
+      const N = segment.length; const win = new Float32Array(N);
+      for(let i=0;i<N;i++){ const wH=0.5 - 0.5*Math.cos(2*Math.PI*i/(N-1)); win[i]=segment[i]*wH; }
+      const {mags} = fftMag(win, state.recSR);
       const bins=mags.length;
       let maxMag=1e-9; for(let i=0;i<bins;i++){ if(mags[i]>maxMag) maxMag=mags[i]; }
       const barW=Math.max(1,(w/bins));
@@ -648,6 +761,7 @@
       }
       const nyquist = state.recSR/2;
       drawAxes(ctx,{mode:'freq', nyquist});
+      drawFFTCursorOverlay(state.recSR, bins, (i)=> mags[i]/maxMag );
     }
 
     function drawNoData(){
@@ -681,10 +795,8 @@
   // 左クリック → マーカー
   els.canvas.addEventListener('mousedown', (ev)=>{
     if(ev.button===0){
-      if(!((!els.chkShowRec.checked && true) || (els.chkShowRec.checked))){} // just to keep structure
-      // Waveform時のみ
-      const viewTime = (document.getElementById('btnWave').classList.contains('btn-primary'));
-      if(!viewTime) return;
+      const isTimeView = (state.view==='time');
+      if(!isTimeView) return;
       const rect = els.canvas.getBoundingClientRect();
       const x = (ev.clientX - rect.left) * DPR;
       let tSec;
@@ -709,11 +821,14 @@
     }
   });
   els.canvas.addEventListener('mousemove', (ev)=>{
+    // FFTカーソル表示用
+    const rect = els.canvas.getBoundingClientRect();
+    state.cursorX = (ev.clientX - rect.left) * DPR;
     if(!state.dragging) return;
-    const rect=els.canvas.getBoundingClientRect();
-    state.dragEndX = (ev.clientX - rect.left) * DPR;
+    state.dragEndX = state.cursorX;
     if(Math.abs(state.dragEndX - state.dragStartX) > 3) state.dragMoved = true;
   });
+  els.canvas.addEventListener('mouseleave', ()=>{ state.cursorX=null; });
   function applyZoomFromDrag(){
     const x1=Math.min(state.dragStartX,state.dragEndX);
     const x2=Math.max(state.dragStartX,state.dragEndX);
@@ -741,9 +856,7 @@
   // ダブルクリック：ズーム＆マーカーリセット（Waveform時）
   els.canvas.addEventListener('dblclick', ()=>{
     if(els.chkShowRec.checked){ state.tZoom=[0,1]; }
-    // Waveform時のみマーカーリセット
-    const viewTime = (document.getElementById('btnWave').classList.contains('btn-primary'));
-    if(viewTime){
+    if(state.view==='time'){
       state.markerA=state.markerB=null; els.markA.value=els.markB.value='—'; els.deltaT.value='—'; els.speed.value='— m/s';
     }
   });
@@ -767,6 +880,16 @@
   document.getElementById('btnFull').addEventListener('click', ()=>{ const el=document.documentElement; !document.fullscreenElement ? el.requestFullscreen?.() : document.exitFullscreen?.(); });
   document.getElementById('rangeGain').addEventListener('input', e=>{ const v=parseFloat(e.target.value); if(!isFinite(v))return; if(state.gainNode) state.gainNode.gain.value=v; state.gain=v; });
   document.getElementById('rangeTime').addEventListener('input', e=>{ const v=parseFloat(e.target.value); if(!isFinite(v))return; state.timeSpanSec=v; });
+  document.getElementById('displayMax').addEventListener('input', e=>{
+    state.displayMax = parseFloat(e.target.value)||1.0;
+    els.displayMaxLabel.textContent = state.displayMax.toFixed(2);
+  });
+  document.getElementById('triggerLevel').addEventListener('input', e=>{
+    els.triggerLabel.textContent = parseFloat(e.target.value).toFixed(2);
+  });
+  document.getElementById('avgCycles').addEventListener('input', e=>{
+    els.avgLabel.textContent = `${e.target.value} 周期`;
+  });
   document.getElementById('btnRec').addEventListener('click', ()=>{ state.recording? stopRec() : startRec(); });
   document.getElementById('btnSave').addEventListener('click', saveAudio);
   document.getElementById('btnPulse').addEventListener('click', ()=> playStimulus('pulse', parseInt(els.impMs.value||'20',10), parseFloat(els.impGain.value||'0.9')) );
@@ -801,7 +924,6 @@
     const isOsc = els.comboType.value==='osc';
     els.comboOscPanel.classList.toggle('hide', !isOsc);
   });
-  // keep initial
   els.comboOscPanel.classList.toggle('hide', els.comboType.value!=='osc');
   els.comboOscFreqSlider.addEventListener('input', e=>{
     els.comboOscFreqInput.value=e.target.value;
@@ -814,7 +936,7 @@
   // init
   listDevices();
   startMic();
-  log('準備完了：オシレーターは単独発音/同時記録の両方で使用可能。左クリック＝マーカー、右ドラッグ＝ズーム、右クリック単押し/ダブルクリック＝解除。');
+  log('準備完了：正規化は初期ON。表示スケール調整、トリガー位相固定＋N周期平均、FFTはカーソルで周波数表示。');
 })();</script>
 </body>
 </html>
