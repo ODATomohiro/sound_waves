@@ -68,9 +68,9 @@
             </select>
           </div>
           <div class="row">
-            <label>周波数(100–1000Hz)</label>
-            <input type="range" id="comboOscFreqSlider" min="100" max="1000" step="1" value="440">
-            <input type="number" id="comboOscFreqInput" value="440" step="1" style="width:90px">
+            <label>周波数(20–600Hz)</label>
+            <input type="range" id="comboOscFreqSlider" min="20" max="600" step="1" value="440">
+            <input type="number" id="comboOscFreqInput" value="440" step="1" style="width:90px" title="600Hz超はこの数値が優先されます">
           </div>
         </div>
         <div class="row">
@@ -120,9 +120,9 @@
           </select>
         </div>
         <div class="row">
-          <label>周波数(100–1000Hz)</label>
-          <input type="range" id="oscFreqSlider" min="100" max="1000" step="1" value="440">
-          <input type="number" id="oscFreqInput" value="440" step="1" style="width:90px">
+          <label>周波数(20–600Hz)</label>
+          <input type="range" id="oscFreqSlider" min="20" max="600" step="1" value="440">
+          <input type="number" id="oscFreqInput" value="440" step="1" style="width:90px" title="600Hz超はこの数値が優先されます">
         </div>
         <div class="row">
           <label>音量</label>
@@ -143,8 +143,8 @@
         </div>
         <div class="row">
           <label><input id="chkAxes" type="checkbox" checked> 軸表示</label>
-          <!-- 正規化はデフォルトON -->
-          <label><input id="chkAutoNorm" type="checkbox" checked> 波形を自動正規化</label>
+          <!-- 正規化はデフォルトOFF -->
+          <label><input id="chkAutoNorm" type="checkbox"> 波形を自動正規化</label>
         </div>
         <div class="row">
           <label>入力ゲイン</label><input id="rangeGain" type="range" min="0.2" max="5" value="1" step="0.1">
@@ -436,7 +436,9 @@
     const ctx=state.ctx;
     const osc=ctx.createOscillator();
     osc.type=els.oscWave.value;
-    const freq=parseFloat(els.oscFreqInput.value)||440;
+    const sliderF=parseFloat(els.oscFreqSlider.value)||440;
+    const inputF=parseFloat(els.oscFreqInput.value)||sliderF;
+    const freq = (inputF>600)? inputF : sliderF;
     osc.frequency.value=freq;
     const g=ctx.createGain(); g.gain.value=parseFloat(els.oscGain.value);
     osc.connect(g).connect(ctx.destination);
@@ -469,7 +471,9 @@
         const ctx=state.ctx;
         const osc=ctx.createOscillator();
         osc.type=els.comboOscWave.value;
-        let f=parseFloat(els.comboOscFreqInput.value)||440;
+        const sliderF=parseFloat(els.comboOscFreqSlider.value)||440;
+        const inputF = parseFloat(els.comboOscFreqInput.value)||sliderF;
+        const f=(inputF>600)? inputF : sliderF;
         osc.frequency.value=f;
         const g=ctx.createGain(); g.gain.value=gain;
         osc.connect(g).connect(ctx.destination);
@@ -501,7 +505,7 @@
       let bit=N>>1;
       for(; j & bit; bit>>=1){ j ^= bit; }
       j ^= bit;
-      if(i<j){ const tr=re[i]; re[i]=re[j]; re[j]=tr; const ti=im[i]; im[i]=im[j]; im[j]=ti; }
+      if(i<j){ const tr=re[i]; re[i]=re[j]; re[j]=tr; const ti=im[i]; im[i]=im[j]; im[i]=ti; }
     }
     for(let len=2; len<=N; len<<=1){
       const ang = -2*Math.PI/len;
@@ -676,18 +680,6 @@
       drawMarkers(ctx, shownSec);
     }
 
-    function drawRealtimeTime(){
-      state.analyser.getFloatTimeDomainData(state.dataTime);
-      let seg = state.dataTime;
-      // crop to visible time window
-      const need = Math.floor(state.timeSpanSec * state.ctx.sampleRate);
-      if(need < seg.length){
-        seg = seg.subarray(seg.length-need);
-      }
-      seg = scaleSegment(seg, state.ctx.sampleRate);
-      drawTimeFromArray(seg, state.ctx.sampleRate, seg.length/state.ctx.sampleRate);
-    }
-
     function drawFFTCursorOverlay(sampleRate, bins, getMag){
       if(state.cursorX==null) return;
       const w=state.w, h=state.h;
@@ -711,6 +703,18 @@
       ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText(text, bx+tw/2, by+th/2+1);
       ctx.restore();
+    }
+
+    function drawRealtimeTime(){
+      state.analyser.getFloatTimeDomainData(state.dataTime);
+      let seg = state.dataTime;
+      // crop to visible time window
+      const need = Math.floor(state.timeSpanSec * state.ctx.sampleRate);
+      if(need < seg.length){
+        seg = seg.subarray(seg.length-need);
+      }
+      seg = scaleSegment(seg, state.ctx.sampleRate);
+      drawTimeFromArray(seg, state.ctx.sampleRate, seg.length/state.ctx.sampleRate);
     }
 
     function drawRealtimeFFT(){
@@ -793,6 +797,7 @@
 
   // ====== 操作（左クリック＝マーカー／右ドラッグ＝ズーム） ======
   // 左クリック → マーカー
+  const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
   els.canvas.addEventListener('mousedown', (ev)=>{
     if(ev.button===0){
       const isTimeView = (state.view==='time');
@@ -914,7 +919,7 @@
   });
   els.oscFreqInput.addEventListener('input', e=>{
     const val=parseFloat(e.target.value);
-    if(val<1000){ els.oscFreqSlider.value=val; }
+    if(val<=600){ els.oscFreqSlider.value=val; }
     if(state.oscNode) state.oscNode.frequency.value=val;
   });
   els.oscGain.addEventListener('input', e=>{ if(state.oscGainNode) state.oscGainNode.gain.value=parseFloat(e.target.value); });
@@ -930,13 +935,13 @@
   });
   els.comboOscFreqInput.addEventListener('input', e=>{
     const v=parseFloat(e.target.value);
-    if(v<1000){ els.comboOscFreqSlider.value=v; }
+    if(v<=600){ els.comboOscFreqSlider.value=v; }
   });
 
   // init
   listDevices();
   startMic();
-  log('準備完了：正規化は初期ON。表示スケール調整、トリガー位相固定＋N周期平均、FFTはカーソルで周波数表示。');
+  log('準備完了：正規化は初期OFF。オシレーターは20–600Hzスライダー＋600Hz超は数値優先。FFTはカーソルで周波数表示、トリガー位相固定＋N周期平均、ズーム＆マーカー対応。');
 })();</script>
 </body>
 </html>
