@@ -14,7 +14,7 @@
     body{margin:0;background:radial-gradient(1200px 800px at 70% -10%,#1c2435 0%,#0c0f14 60%);color:var(--text);
          font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Noto Sans JP",sans-serif;letter-spacing:.02em;display:flex;flex-direction:column}
     #app{display:flex;min-height:0;flex:1}
-    #sidebar{width:420px;background:linear-gradient(180deg,#0d121c,#0a0e15);border-right:1px solid #1b2637;padding:12px;overflow:auto}
+    #sidebar{width:430px;background:linear-gradient(180deg,#0d121c,#0a0e15);border-right:1px solid #1b2637;padding:12px;overflow:auto}
     #main{flex:1;display:flex;flex-direction:column;min-width:0}
     header{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #1b2637}
     header .title{font-weight:800;letter-spacing:.05em}
@@ -30,7 +30,7 @@
     label{font-size:12px;color:var(--muted)}
     select,input[type="number"],input[type="text"]{background:#0d1220;border:1px solid #203046;border-radius:10px;padding:6px;color:#fff}
     input[type="range"]{accent-color:#6de;cursor:pointer}
-    input[type="number"].wide{width:120px} /* 任意振動数の見切れ防止 */
+    input[type="number"].wide{width:120px}
     .small{font-size:12px;color:var(--muted)}
     #log{font-size:12px;background:#000;border:1px solid #1b2637;border-radius:10px;padding:8px;max-height:140px;overflow:auto;color:#0f0}
     .muted{opacity:.85}
@@ -62,7 +62,6 @@
           <input id="comboGain" type="range" min="0" max="1" step="0.01" value="0.9">
         </div>
 
-        <!-- ★ 常時表示：オシレーター設定（録音＋発音） -->
         <fieldset id="comboOscPanel">
           <legend>⚙ オシレーター設定（録音＋発音）</legend>
           <div class="row">
@@ -77,6 +76,7 @@
           <div class="row">
             <label>周波数(20–600Hz)</label>
             <input type="range" id="comboOscFreqSlider" min="20" max="600" step="1" value="440">
+            <label>振動数（周波数）</label>
             <input type="number" id="comboOscFreqInput" class="wide" value="440" step="1" title="600Hz超はこの数値が優先されます">
           </div>
           <div class="small">※ 種類が「オシレーター」のときに使用します（表示は常時）。</div>
@@ -139,13 +139,13 @@
             <input type="range" id="oscFreqSlider" min="20" max="600" step="1" value="440">
           </div>
           <div>
-            <label>任意周波数</label>
+            <label>振動数（周波数）</label>
             <input type="number" id="oscFreqInput" class="wide" value="440" step="1" title="600Hz超はこの数値が優先されます">
           </div>
         </div>
 
         <div id="stereoControls" class="hide">
-          <div class="row"><strong>左チャンネル</strong></div>
+          <div class="row"><strong>左チャンネル</strong>　<label><input type="checkbox" id="enableL" checked> ON</label></div>
           <div class="row">
             <label>波形</label>
             <select id="oscWaveL">
@@ -158,10 +158,11 @@
           <div class="row">
             <label>周波数(20–600Hz)</label>
             <input type="range" id="oscFreqL" min="20" max="600" step="1" value="440">
+            <label>振動数（周波数）</label>
             <input type="number" id="oscFreqInputL" class="wide" value="440" step="1">
           </div>
 
-          <div class="row" style="margin-top:8px;"><strong>右チャンネル</strong></div>
+          <div class="row" style="margin-top:8px;"><strong>右チャンネル</strong>　<label><input type="checkbox" id="enableR" checked> ON</label></div>
           <div class="row">
             <label>波形</label>
             <select id="oscWaveR">
@@ -174,11 +175,12 @@
           <div class="row">
             <label>周波数(20–600Hz)</label>
             <input type="range" id="oscFreqR" min="20" max="600" step="1" value="444">
+            <label>振動数（周波数）</label>
             <input type="number" id="oscFreqInputR" class="wide" value="444" step="1">
           </div>
 
           <div class="row">
-            <div class="subtle">ビート周波数：<span id="beatHz">0.0</span> Hz</div>
+            <div class="subtle">ビート周波数：<span id="beatHz">—</span> Hz</div>
           </div>
         </div>
 
@@ -201,7 +203,6 @@
         </div>
         <div class="row">
           <label><input id="chkAxes" type="checkbox" checked> 軸表示</label>
-          <!-- 正規化はデフォルトOFF -->
           <label><input id="chkAutoNorm" type="checkbox"> 波形を自動正規化</label>
         </div>
         <div class="row">
@@ -357,6 +358,8 @@
     oscFreqR: document.getElementById('oscFreqR'),
     oscFreqInputL: document.getElementById('oscFreqInputL'),
     oscFreqInputR: document.getElementById('oscFreqInputR'),
+    enableL: document.getElementById('enableL'),
+    enableR: document.getElementById('enableR'),
     beatHz: document.getElementById('beatHz'),
   };
 
@@ -369,28 +372,21 @@
     gainNode: null,
     mediaStream: null,
     deviceId: null,
-    view: 'time', // 'time' | 'fft'
+    view: 'time',
     timeSpanSec: parseFloat(els.rangeTime.value),
     gain: 1,
-    displayMax: parseFloat(els.displayMax.value), // 振幅の最大値（±displayMaxが画面上下に収まる）
+    displayMax: parseFloat(els.displayMax.value),
     fftSize: 2048,
     dataTime: null,
     dataFreq: null,
     w: 0, h: 0,
-    // markers
     markerA: null, markerB: null,
-    // recorder
     recorder: null, recording: false, chunks: [], lastBlob: null,
-    // recorded visualization buffer (PCM from analyser snapshots)
     recVisSamples: new Float32Array(0), recSR: 48000,
-    // zoom (for recorded mode) normalized [0,1]
     tZoom: [0,1],
-    // right-drag zoom handling
     dragging: false, dragStartX: 0, dragEndX: 0, dragMoved: false,
-    // standalone oscillator
     oscNode: null, oscGainNode: null,
     oscNodeL: null, oscNodeR: null, gainL: null, gainR: null, panL: null, panR: null,
-    // fft cursor
     cursorX: null
   };
 
@@ -460,7 +456,7 @@
       state.recorder = new MediaRecorder(state.mediaStream);
     }catch(e){ log('Recorder作成失敗: '+e.message); return; }
     state.chunks = [];
-    state.recVisSamples = new Float32Array(0); // reset viz buffer
+    state.recVisSamples = new Float32Array(0);
     state.recorder.ondataavailable = e=>{ if(e.data && e.data.size>0) state.chunks.push(e.data); };
     state.recorder.onstop = ()=>{
       state.lastBlob = new Blob(state.chunks, {type: state.recorder.mimeType || 'audio/webm'});
@@ -507,27 +503,31 @@
     const gainValue=parseFloat(els.oscGain.value)||0.5;
 
     if(els.stereoMode.checked){
-      // L
-      const oscL=ctx.createOscillator(); oscL.type=els.oscWaveL.value;
-      const sliderFL=parseFloat(els.oscFreqL.value)||440;
-      const inputFL=parseFloat(els.oscFreqInputL.value)||sliderFL;
-      const fL=(inputFL>600)? inputFL : sliderFL;
-      const gL=ctx.createGain(); gL.gain.value=gainValue;
-      const pL=ctx.createStereoPanner(); pL.pan.value=-1;
-      oscL.frequency.value=fL; oscL.connect(gL).connect(pL).connect(ctx.destination); oscL.start();
+      const useL = !!els.enableL.checked;
+      const useR = !!els.enableR.checked;
 
-      // R
-      const oscR=ctx.createOscillator(); oscR.type=els.oscWaveR.value;
-      const sliderFR=parseFloat(els.oscFreqR.value)||440;
-      const inputFR=parseFloat(els.oscFreqInputR.value)||sliderFR;
-      const fR=(inputFR>600)? inputFR : sliderFR;
-      const gR=ctx.createGain(); gR.gain.value=gainValue;
-      const pR=ctx.createStereoPanner(); pR.pan.value=1;
-      oscR.frequency.value=fR; oscR.connect(gR).connect(pR).connect(ctx.destination); oscR.start();
-
-      state.oscNodeL=oscL; state.oscNodeR=oscR; state.gainL=gL; state.gainR=gR; state.panL=pL; state.panR=pR;
+      if(useL){
+        const oscL=ctx.createOscillator(); oscL.type=els.oscWaveL.value;
+        const sliderFL=parseFloat(els.oscFreqL.value)||440;
+        const inputFL=parseFloat(els.oscFreqInputL.value)||sliderFL;
+        const fL=(inputFL>600)? inputFL : sliderFL;
+        const gL=ctx.createGain(); gL.gain.value=gainValue;
+        const pL=ctx.createStereoPanner(); pL.pan.value=-1;
+        oscL.frequency.value=fL; oscL.connect(gL).connect(pL).connect(ctx.destination); oscL.start();
+        state.oscNodeL=oscL; state.gainL=gL; state.panL=pL;
+      }
+      if(useR){
+        const oscR=ctx.createOscillator(); oscR.type=els.oscWaveR.value;
+        const sliderFR=parseFloat(els.oscFreqR.value)||440;
+        const inputFR=parseFloat(els.oscFreqInputR.value)||sliderFR;
+        const fR=(inputFR>600)? inputFR : sliderFR;
+        const gR=ctx.createGain(); gR.gain.value=gainValue;
+        const pR=ctx.createStereoPanner(); pR.pan.value=1;
+        oscR.frequency.value=fR; oscR.connect(gR).connect(pR).connect(ctx.destination); oscR.start();
+        state.oscNodeR=oscR; state.gainR=gR; state.panR=pR;
+      }
       updateBeat();
-      log(`ステレオ発振: L=${fL}Hz (${oscL.type}), R=${fR}Hz (${oscR.type})`);
+      log(`ステレオ発振: L=${useL?'ON':'OFF'}, R=${useR?'ON':'OFF'}`);
     }else{
       const osc=ctx.createOscillator(); osc.type=els.oscWave.value;
       const sliderF=parseFloat(els.oscFreqSlider.value)||440;
@@ -560,10 +560,11 @@
     return {fL, fR};
   }
   function updateBeat(){
-    if(!els.stereoMode.checked) { if(els.beatHz) els.beatHz.textContent = '0.0'; return; }
+    if(!els.stereoMode.checked){ if(els.beatHz) els.beatHz.textContent='—'; return; }
+    if(!els.enableL.checked || !els.enableR.checked){ els.beatHz.textContent='—'; return; }
     const {fL, fR} = getStereoFreqs();
     const beat = Math.abs(fL - fR);
-    if(els.beatHz) els.beatHz.textContent = beat.toFixed(2);
+    els.beatHz.textContent = isFinite(beat) ? beat.toFixed(2) : '—';
   }
 
   // Combined: record -> play (pulse/noise/osc) -> stop
@@ -598,7 +599,6 @@
     setTimeout(()=>{ stopRec(); }, pre + dur + post);
   }
 
-  // Append analyser snapshot into recorded viz buffer (during recording)
   function appendRecVis(samples){
     const old = state.recVisSamples;
     const merged = new Float32Array(old.length + samples.length);
@@ -630,7 +630,7 @@
           const vRe=re[i+k+(len>>1)]*wRe - im[i+k+(len>>1)]*wIm;
           const vIm=re[i+k+(len>>1)]*wIm + im[i+k+(len>>1)]*wRe;
           re[i+k] = uRe + vRe; im[i+k] = uIm + vIm;
-          re[i+k+(len>>1)] = uRe - vRe; im[i+k+(len>>1)] = uIm - vIm;
+          re[i+k+(len>>1)] = uRe - vRe; im[i+k] = uIm - vIm;
           const nwRe = wRe*wlenRe - wIm*wlenIm;
           const nwIm = wRe*wlenIm + wIm*wlenRe;
           wRe = nwRe; wIm = nwIm;
@@ -658,15 +658,15 @@
         return out;
       }
     }
-    return arr; // no crossing found
+    return arr;
   }
 
-  // Average N cycles using estimated period from FFT peak
+  // Average cycles
   function averageCycles(arr, sampleRate, cycles){
     if(cycles<=1) return arr;
     const {freq} = fftMag(arr, sampleRate);
     if(!isFinite(freq) || freq<=0) return arr;
-    const period = Math.max(8, Math.round(sampleRate / freq)); // in samples
+    const period = Math.max(8, Math.round(sampleRate / freq));
     const total = Math.min(arr.length, period * cycles);
     const buf = arr.subarray(0, total);
     const out = new Float32Array(period);
@@ -748,7 +748,6 @@
     ctx.restore();
   }
 
-  // Render loop
   function renderLoop(){
     const ctx = els.canvas.getContext('2d');
     const w=state.w, h=state.h;
@@ -774,7 +773,7 @@
     }
 
     function drawTimeFromArray(arr, sampleRate, spanSec){
-      let a = arr;
+      const a = arr;
       const mid=h/2; const scaleY=h*0.42*state.gain;
       ctx.beginPath();
       for(let i=0;i<a.length;i++){
@@ -789,13 +788,13 @@
     }
 
     function drawFFTCursorOverlay(sampleRate, bins, getMag){
-      if(state.cursorX==null) return;
       const w=state.w, h=state.h;
-      const x = Math.max(0, Math.min(w-1, state.cursorX));
+      const x = state.cursorX==null ? null : Math.max(0, Math.min(w-1, state.cursorX));
+      if(x==null) return;
       const bin = Math.max(0, Math.min(bins-1, Math.round((x/w) * (bins-1))));
       const nyq = sampleRate/2;
       const freq = (bin / (bins-1)) * nyq;
-      const mag = getMag(bin); // 0..1
+      const mag = getMag(bin);
       ctx.save();
       ctx.strokeStyle='rgba(255,255,255,0.75)'; ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
@@ -872,6 +871,8 @@
     }
 
     function drawNoData(){
+      const ctx = els.canvas.getContext('2d');
+      const w=state.w, h=state.h;
       ctx.fillStyle='rgba(255,255,255,0.65)';
       ctx.font=`${14*DPR}px system-ui`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -1010,6 +1011,7 @@
   els.btnOscStart.addEventListener('click', oscStart);
   els.btnOscStop.addEventListener('click', oscStop);
   els.oscWave.addEventListener('change', ()=>{ if(state.oscNode) state.oscNode.type=els.oscWave.value; });
+  // Mono sync
   els.oscFreqSlider.addEventListener('input', e=>{
     els.oscFreqInput.value=e.target.value;
     if(state.oscNode) state.oscNode.frequency.value=parseFloat(e.target.value);
@@ -1033,25 +1035,38 @@
     els.stereoControls.classList.toggle('hide', !on);
     updateBeat();
   });
-  [els.oscFreqL, els.oscFreqR, els.oscFreqInputL, els.oscFreqInputR, els.oscWaveL, els.oscWaveR]
-    .forEach(el => el && el.addEventListener('input', ()=>{
-      updateBeat();
-      if(state.oscNodeL){
-        const {fL} = getStereoFreqs();
-        state.oscNodeL.frequency.value = fL;
-        state.oscNodeL.type = els.oscWaveL.value;
-      }
-      if(state.oscNodeR){
-        const {fR} = getStereoFreqs();
-        state.oscNodeR.frequency.value = fR;
-        state.oscNodeR.type = els.oscWaveR.value;
-      }
-    }));
 
-  // Combo type UI toggle（見た目は常時表示だが、機能としてはosc選択時に使用）
-  els.comboType.addEventListener('change', ()=>{
-    // 表示は変えない（常時表示）
+  // Stereo sync (L/R slider <-> number 双方向同期)
+  function syncStereoRuntime(){
+    if(state.oscNodeL){
+      const sliderFL=parseFloat(els.oscFreqL.value)||440;
+      const inputFL=parseFloat(els.oscFreqInputL.value)||sliderFL;
+      state.oscNodeL.frequency.value = (inputFL>600)? inputFL : sliderFL;
+      state.oscNodeL.type = els.oscWaveL.value;
+    }
+    if(state.oscNodeR){
+      const sliderFR=parseFloat(els.oscFreqR.value)||440;
+      const inputFR=parseFloat(els.oscFreqInputR.value)||sliderFR;
+      state.oscNodeR.frequency.value = (inputFR>600)? inputFR : sliderFR;
+      state.oscNodeR.type = els.oscWaveR.value;
+    }
+  }
+  ['input','change'].forEach(evt=>{
+    [els.oscFreqL, els.oscFreqInputL].forEach(el=> el.addEventListener(evt, e=>{
+      if(e.target===els.oscFreqL){ els.oscFreqInputL.value = e.target.value; }
+      if(e.target===els.oscFreqInputL && parseFloat(e.target.value)<=600){ els.oscFreqL.value = e.target.value; }
+      updateBeat(); syncStereoRuntime();
+    }));
+    [els.oscFreqR, els.oscFreqInputR].forEach(el=> el.addEventListener(evt, e=>{
+      if(e.target===els.oscFreqR){ els.oscFreqInputR.value = e.target.value; }
+      if(e.target===els.oscFreqInputR && parseFloat(e.target.value)<=600){ els.oscFreqR.value = e.target.value; }
+      updateBeat(); syncStereoRuntime();
+    }));
+    [els.oscWaveL, els.oscWaveR].forEach(el=> el.addEventListener(evt, ()=>{ syncStereoRuntime(); }));
+    [els.enableL, els.enableR].forEach(el=> el.addEventListener(evt, ()=>{ updateBeat(); }));
   });
+
+  // Combo oscillator slider/number sync
   els.comboOscFreqSlider.addEventListener('input', e=>{
     els.comboOscFreqInput.value=e.target.value;
   });
@@ -1064,7 +1079,7 @@
   listDevices();
   startMic();
   updateBeat();
-  log('修正版：録音＋発音のオシレーター設定を常時表示。任意振動数入力欄は見切れないよう拡幅。全機能維持。');
+  log('フル機能統合版：表記統一、L/R同期＆個別ON/OFF、FFTカーソル、ズーム、マーカー、トリガー平均化等すべて搭載。');
 })();</script>
 </body>
 </html>
