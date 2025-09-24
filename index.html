@@ -14,7 +14,7 @@
     body{margin:0;background:radial-gradient(1200px 800px at 70% -10%,#1c2435 0%,#0c0f14 60%);color:var(--text);
          font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Noto Sans JP",sans-serif;letter-spacing:.02em;display:flex;flex-direction:column}
     #app{display:flex;min-height:0;flex:1}
-    #sidebar{width:390px;background:linear-gradient(180deg,#0d121c,#0a0e15);border-right:1px solid #1b2637;padding:12px;overflow:auto}
+    #sidebar{width:420px;background:linear-gradient(180deg,#0d121c,#0a0e15);border-right:1px solid #1b2637;padding:12px;overflow:auto}
     #main{flex:1;display:flex;flex-direction:column;min-width:0}
     header{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #1b2637}
     header .title{font-weight:800;letter-spacing:.05em}
@@ -30,11 +30,16 @@
     label{font-size:12px;color:var(--muted)}
     select,input[type="number"],input[type="text"]{background:#0d1220;border:1px solid #203046;border-radius:10px;padding:6px;color:#fff}
     input[type="range"]{accent-color:#6de;cursor:pointer}
+    input[type="number"].wide{width:120px} /* 任意振動数の見切れ防止 */
     .small{font-size:12px;color:var(--muted)}
     #log{font-size:12px;background:#000;border:1px solid #1b2637;border-radius:10px;padding:8px;max-height:140px;overflow:auto;color:#0f0}
     .muted{opacity:.85}
     .hide{display:none}
     footer{border-top:1px solid #1b2637;padding:8px 12px;text-align:right;color:#cfd6e6;opacity:.8}
+    .subtle{color:#cfe7ff90;font-size:12px;margin-top:4px}
+    .monoGrid{display:grid;grid-template-columns:1fr 120px;gap:8px;align-items:center}
+    fieldset{border:1px solid #1b2637;border-radius:10px;padding:8px;margin:8px 0}
+    legend{padding:0 6px;color:#cfe7ffcc}
   </style>
 </head>
 <body>
@@ -56,8 +61,10 @@
           <label>音量</label>
           <input id="comboGain" type="range" min="0" max="1" step="0.01" value="0.9">
         </div>
-        <div id="comboOscPanel" class="card">
-          <h3 style="border:none;margin:0 0 6px 0;padding:0;">⚙ オシレーター設定</h3>
+
+        <!-- ★ 常時表示：オシレーター設定（録音＋発音） -->
+        <fieldset id="comboOscPanel">
+          <legend>⚙ オシレーター設定（録音＋発音）</legend>
           <div class="row">
             <label>波形</label>
             <select id="comboOscWave">
@@ -70,9 +77,11 @@
           <div class="row">
             <label>周波数(20–600Hz)</label>
             <input type="range" id="comboOscFreqSlider" min="20" max="600" step="1" value="440">
-            <input type="number" id="comboOscFreqInput" value="440" step="1" style="width:90px" title="600Hz超はこの数値が優先されます">
+            <input type="number" id="comboOscFreqInput" class="wide" value="440" step="1" title="600Hz超はこの数値が優先されます">
           </div>
-        </div>
+          <div class="small">※ 種類が「オシレーター」のときに使用します（表示は常時）。</div>
+        </fieldset>
+
         <div class="row">
           <label>事前待機(ms)</label>
           <input id="comboPreMs" type="number" value="200" step="10" min="0">
@@ -111,19 +120,68 @@
       <div class="card">
         <h3>🎵 オシレーター（単独）</h3>
         <div class="row">
-          <label>波形</label>
-          <select id="oscWave">
-            <option value="sine" selected>正弦波</option>
-            <option value="square">矩形波</option>
-            <option value="triangle">三角波</option>
-            <option value="sawtooth">のこぎり波</option>
-          </select>
+          <label><input type="checkbox" id="stereoMode"> ステレオモード（デフォルトOFF）</label>
         </div>
-        <div class="row">
-          <label>周波数(20–600Hz)</label>
-          <input type="range" id="oscFreqSlider" min="20" max="600" step="1" value="440">
-          <input type="number" id="oscFreqInput" value="440" step="1" style="width:90px" title="600Hz超はこの数値が優先されます">
+
+        <div id="monoControls" class="monoGrid">
+          <div>
+            <label>波形</label>
+            <select id="oscWave">
+              <option value="sine" selected>正弦波</option>
+              <option value="square">矩形波</option>
+              <option value="triangle">三角波</option>
+              <option value="sawtooth">のこぎり波</option>
+            </select>
+          </div>
+          <div></div>
+          <div>
+            <label>周波数(20–600Hz)</label>
+            <input type="range" id="oscFreqSlider" min="20" max="600" step="1" value="440">
+          </div>
+          <div>
+            <label>任意周波数</label>
+            <input type="number" id="oscFreqInput" class="wide" value="440" step="1" title="600Hz超はこの数値が優先されます">
+          </div>
         </div>
+
+        <div id="stereoControls" class="hide">
+          <div class="row"><strong>左チャンネル</strong></div>
+          <div class="row">
+            <label>波形</label>
+            <select id="oscWaveL">
+              <option value="sine" selected>正弦波</option>
+              <option value="square">矩形波</option>
+              <option value="triangle">三角波</option>
+              <option value="sawtooth">のこぎり波</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>周波数(20–600Hz)</label>
+            <input type="range" id="oscFreqL" min="20" max="600" step="1" value="440">
+            <input type="number" id="oscFreqInputL" class="wide" value="440" step="1">
+          </div>
+
+          <div class="row" style="margin-top:8px;"><strong>右チャンネル</strong></div>
+          <div class="row">
+            <label>波形</label>
+            <select id="oscWaveR">
+              <option value="sine" selected>正弦波</option>
+              <option value="square">矩形波</option>
+              <option value="triangle">三角波</option>
+              <option value="sawtooth">のこぎり波</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>周波数(20–600Hz)</label>
+            <input type="range" id="oscFreqR" min="20" max="600" step="1" value="444">
+            <input type="number" id="oscFreqInputR" class="wide" value="444" step="1">
+          </div>
+
+          <div class="row">
+            <div class="subtle">ビート周波数：<span id="beatHz">0.0</span> Hz</div>
+          </div>
+        </div>
+
         <div class="row">
           <label>音量</label>
           <input type="range" id="oscGain" min="0" max="1" step="0.01" value="0.5">
@@ -283,12 +341,23 @@
     selDevice: document.getElementById('selDevice'),
     btnRefresh: document.getElementById('btnRefresh'),
     // oscillator (standalone)
+    stereoMode: document.getElementById('stereoMode'),
     oscWave: document.getElementById('oscWave'),
     oscFreqSlider: document.getElementById('oscFreqSlider'),
     oscFreqInput: document.getElementById('oscFreqInput'),
     oscGain: document.getElementById('oscGain'),
     btnOscStart: document.getElementById('btnOscStart'),
     btnOscStop: document.getElementById('btnOscStop'),
+    // stereo
+    monoControls: document.getElementById('monoControls'),
+    stereoControls: document.getElementById('stereoControls'),
+    oscWaveL: document.getElementById('oscWaveL'),
+    oscWaveR: document.getElementById('oscWaveR'),
+    oscFreqL: document.getElementById('oscFreqL'),
+    oscFreqR: document.getElementById('oscFreqR'),
+    oscFreqInputL: document.getElementById('oscFreqInputL'),
+    oscFreqInputR: document.getElementById('oscFreqInputR'),
+    beatHz: document.getElementById('beatHz'),
   };
 
   const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -302,7 +371,7 @@
     deviceId: null,
     view: 'time', // 'time' | 'fft'
     timeSpanSec: parseFloat(els.rangeTime.value),
-    gain: parseFloat(els.rangeGain.value),
+    gain: 1,
     displayMax: parseFloat(els.displayMax.value), // 振幅の最大値（±displayMaxが画面上下に収まる）
     fftSize: 2048,
     dataTime: null,
@@ -320,6 +389,7 @@
     dragging: false, dragStartX: 0, dragEndX: 0, dragMoved: false,
     // standalone oscillator
     oscNode: null, oscGainNode: null,
+    oscNodeL: null, oscNodeR: null, gainL: null, gainR: null, panL: null, panR: null,
     // fft cursor
     cursorX: null
   };
@@ -362,7 +432,7 @@
       state.recSR = ctx.sampleRate;
 
       state.srcNode = ctx.createMediaStreamSource(stream);
-      state.gainNode = ctx.createGain(); state.gainNode.gain.value = state.gain;
+      state.gainNode = ctx.createGain(); state.gainNode.gain.value = 1;
       state.analyser = ctx.createAnalyser(); state.analyser.fftSize = state.fftSize; state.analyser.smoothingTimeConstant = 0.12;
       state.srcNode.connect(state.gainNode); state.gainNode.connect(state.analyser);
 
@@ -434,22 +504,66 @@
     if(!state.ctx) state.ctx=new (window.AudioContext||window.webkitAudioContext)();
     oscStop();
     const ctx=state.ctx;
-    const osc=ctx.createOscillator();
-    osc.type=els.oscWave.value;
-    const sliderF=parseFloat(els.oscFreqSlider.value)||440;
-    const inputF=parseFloat(els.oscFreqInput.value)||sliderF;
-    const freq = (inputF>600)? inputF : sliderF;
-    osc.frequency.value=freq;
-    const g=ctx.createGain(); g.gain.value=parseFloat(els.oscGain.value);
-    osc.connect(g).connect(ctx.destination);
-    osc.start();
-    state.oscNode=osc; state.oscGainNode=g;
-    log(`オシレーター開始: ${osc.type}, ${freq}Hz`);
+    const gainValue=parseFloat(els.oscGain.value)||0.5;
+
+    if(els.stereoMode.checked){
+      // L
+      const oscL=ctx.createOscillator(); oscL.type=els.oscWaveL.value;
+      const sliderFL=parseFloat(els.oscFreqL.value)||440;
+      const inputFL=parseFloat(els.oscFreqInputL.value)||sliderFL;
+      const fL=(inputFL>600)? inputFL : sliderFL;
+      const gL=ctx.createGain(); gL.gain.value=gainValue;
+      const pL=ctx.createStereoPanner(); pL.pan.value=-1;
+      oscL.frequency.value=fL; oscL.connect(gL).connect(pL).connect(ctx.destination); oscL.start();
+
+      // R
+      const oscR=ctx.createOscillator(); oscR.type=els.oscWaveR.value;
+      const sliderFR=parseFloat(els.oscFreqR.value)||440;
+      const inputFR=parseFloat(els.oscFreqInputR.value)||sliderFR;
+      const fR=(inputFR>600)? inputFR : sliderFR;
+      const gR=ctx.createGain(); gR.gain.value=gainValue;
+      const pR=ctx.createStereoPanner(); pR.pan.value=1;
+      oscR.frequency.value=fR; oscR.connect(gR).connect(pR).connect(ctx.destination); oscR.start();
+
+      state.oscNodeL=oscL; state.oscNodeR=oscR; state.gainL=gL; state.gainR=gR; state.panL=pL; state.panR=pR;
+      updateBeat();
+      log(`ステレオ発振: L=${fL}Hz (${oscL.type}), R=${fR}Hz (${oscR.type})`);
+    }else{
+      const osc=ctx.createOscillator(); osc.type=els.oscWave.value;
+      const sliderF=parseFloat(els.oscFreqSlider.value)||440;
+      const inputF=parseFloat(els.oscFreqInput.value)||sliderF;
+      const f=(inputF>600)? inputF : sliderF;
+      const g=ctx.createGain(); g.gain.value=gainValue;
+      osc.frequency.value=f; osc.connect(g).connect(ctx.destination); osc.start();
+      state.oscNode=osc; state.oscGainNode=g;
+      log(`モノラル発振: ${f}Hz (${osc.type})`);
+    }
   }
   function oscStop(){
     if(state.oscNode){ try{state.oscNode.stop();}catch{} state.oscNode.disconnect(); state.oscNode=null; }
     if(state.oscGainNode){ state.oscGainNode.disconnect(); state.oscGainNode=null; }
+    if(state.oscNodeL){ try{state.oscNodeL.stop();}catch{} state.oscNodeL.disconnect(); state.oscNodeL=null; }
+    if(state.oscNodeR){ try{state.oscNodeR.stop();}catch{} state.oscNodeR.disconnect(); state.oscNodeR=null; }
+    if(state.gainL){ state.gainL.disconnect(); state.gainL=null; } if(state.gainR){ state.gainR.disconnect(); state.gainR=null; }
+    if(state.panL){ state.panL.disconnect(); state.panL=null; } if(state.panR){ state.panR.disconnect(); state.panR=null; }
     log('オシレーター停止');
+  }
+
+  // Beat display
+  function getStereoFreqs(){
+    const sliderFL=parseFloat(els.oscFreqL.value)||440;
+    const inputFL=parseFloat(els.oscFreqInputL.value)||sliderFL;
+    const fL=(inputFL>600)? inputFL : sliderFL;
+    const sliderFR=parseFloat(els.oscFreqR.value)||440;
+    const inputFR=parseFloat(els.oscFreqInputR.value)||sliderFR;
+    const fR=(inputFR>600)? inputFR : sliderFR;
+    return {fL, fR};
+  }
+  function updateBeat(){
+    if(!els.stereoMode.checked) { if(els.beatHz) els.beatHz.textContent = '0.0'; return; }
+    const {fL, fR} = getStereoFreqs();
+    const beat = Math.abs(fL - fR);
+    if(els.beatHz) els.beatHz.textContent = beat.toFixed(2);
   }
 
   // Combined: record -> play (pulse/noise/osc) -> stop
@@ -474,10 +588,9 @@
         const sliderF=parseFloat(els.comboOscFreqSlider.value)||440;
         const inputF = parseFloat(els.comboOscFreqInput.value)||sliderF;
         const f=(inputF>600)? inputF : sliderF;
-        osc.frequency.value=f;
         const g=ctx.createGain(); g.gain.value=gain;
         osc.connect(g).connect(ctx.destination);
-        osc.start();
+        osc.frequency.value=f; osc.start();
         log(`発音(osc: ${osc.type}, ${f}Hz, gain=${gain})`);
         setTimeout(()=>{ try{osc.stop();}catch{} }, dur);
       }
@@ -493,7 +606,7 @@
     state.recVisSamples = merged;
   }
 
-  // FFT
+  // FFT helpers
   function nextPow2(n){ let p=1; while(p<n) p<<=1; return p; }
   function fftMag(input, sampleRate){
     const N = nextPow2(input.length);
@@ -526,14 +639,13 @@
     }
     const mags = new Float32Array(N/2);
     for(let i=0;i<N/2;i++){ mags[i] = Math.sqrt(re[i]*re[i] + im[i]*im[i]) / (N/2); }
-    // peak estimate
     let peak=0, idx=0;
     for(let i=1;i<mags.length;i++){ if(mags[i]>peak){ peak=mags[i]; idx=i; } }
     const freq = (idx * sampleRate) / N;
     return {mags, freq};
   }
 
-  // Trigger utility: rotate array so that first rising crossing at level becomes index 0
+  // Trigger utility
   function rotateAtTrigger(arr, level){
     const N = arr.length;
     for(let i=0;i<N-1;i++){
@@ -560,11 +672,7 @@
     const out = new Float32Array(period);
     let count = Math.floor(total / period);
     if(count<1) return arr;
-    for(let c=0;c<count;c++){
-      for(let i=0;i<period;i++){
-        out[i] += buf[c*period + i];
-      }
-    }
+    for(let c=0;c<count;c++){ for(let i=0;i<period;i++){ out[i] += buf[c*period + i]; } }
     for(let i=0;i<period;i++) out[i] /= count;
     return out;
   }
@@ -688,11 +796,9 @@
       const nyq = sampleRate/2;
       const freq = (bin / (bins-1)) * nyq;
       const mag = getMag(bin); // 0..1
-      // vertical line
       ctx.save();
       ctx.strokeStyle='rgba(255,255,255,0.75)'; ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
-      // label
       const text = `${freq.toFixed(1)} Hz  |  ${Math.round(mag*100)} %`;
       const pad=6; ctx.font=`${12*DPR}px system-ui`; const tw=ctx.measureText(text).width+pad*2;
       const th=18*DPR;
@@ -708,11 +814,8 @@
     function drawRealtimeTime(){
       state.analyser.getFloatTimeDomainData(state.dataTime);
       let seg = state.dataTime;
-      // crop to visible time window
       const need = Math.floor(state.timeSpanSec * state.ctx.sampleRate);
-      if(need < seg.length){
-        seg = seg.subarray(seg.length-need);
-      }
+      if(need < seg.length){ seg = seg.subarray(seg.length-need); }
       seg = scaleSegment(seg, state.ctx.sampleRate);
       drawTimeFromArray(seg, state.ctx.sampleRate, seg.length/state.ctx.sampleRate);
     }
@@ -796,14 +899,13 @@
   }
 
   // ====== 操作（左クリック＝マーカー／右ドラッグ＝ズーム） ======
-  // 左クリック → マーカー
-  const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const DPR2 = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
   els.canvas.addEventListener('mousedown', (ev)=>{
     if(ev.button===0){
       const isTimeView = (state.view==='time');
       if(!isTimeView) return;
       const rect = els.canvas.getBoundingClientRect();
-      const x = (ev.clientX - rect.left) * DPR;
+      const x = (ev.clientX - rect.left) * DPR2;
       let tSec;
       if(els.chkShowRec.checked){
         const [a,b]=state.tZoom;
@@ -816,19 +918,17 @@
       }
       placeMarker(tSec);
     }
-    // 右ボタンでズーム開始（録音結果モードのみ）
     if(ev.button===2){
       if(!els.chkShowRec.checked) return;
       state.dragging=true; state.dragMoved=false;
       const rect=els.canvas.getBoundingClientRect();
-      state.dragStartX = (ev.clientX - rect.left) * DPR;
+      state.dragStartX = (ev.clientX - rect.left) * DPR2;
       state.dragEndX = state.dragStartX;
     }
   });
   els.canvas.addEventListener('mousemove', (ev)=>{
-    // FFTカーソル表示用
     const rect = els.canvas.getBoundingClientRect();
-    state.cursorX = (ev.clientX - rect.left) * DPR;
+    state.cursorX = (ev.clientX - rect.left) * DPR2;
     if(!state.dragging) return;
     state.dragEndX = state.cursorX;
     if(Math.abs(state.dragEndX - state.dragStartX) > 3) state.dragMoved = true;
@@ -837,7 +937,7 @@
   function applyZoomFromDrag(){
     const x1=Math.min(state.dragStartX,state.dragEndX);
     const x2=Math.max(state.dragStartX,state.dragEndX);
-    const minSel = 6*DPR;
+    const minSel = 6*DPR2;
     if(x2-x1 < minSel){ state.dragging=false; return false; }
     const a = x1/state.w, b = x2/state.w;
     state.tZoom=[
@@ -847,18 +947,15 @@
     state.dragging=false;
     return true;
   }
-  // 右ボタン離し：ドラッグしていればズーム確定、単押しならズーム解除
   els.canvas.addEventListener('mouseup', (ev)=>{
     if(ev.button!==2) return;
     if(!els.chkShowRec.checked) return;
     const moved = state.dragMoved;
     if(state.dragging){ applyZoomFromDrag(); }
     state.dragging=false; state.dragMoved=false;
-    if(!moved){ state.tZoom=[0,1]; } // 単押し＝解除
+    if(!moved){ state.tZoom=[0,1]; }
   });
-  // コンテキストメニュー抑止
   els.canvas.addEventListener('contextmenu', (e)=>e.preventDefault());
-  // ダブルクリック：ズーム＆マーカーリセット（Waveform時）
   els.canvas.addEventListener('dblclick', ()=>{
     if(els.chkShowRec.checked){ state.tZoom=[0,1]; }
     if(state.view==='time'){
@@ -922,14 +1019,39 @@
     if(val<=600){ els.oscFreqSlider.value=val; }
     if(state.oscNode) state.oscNode.frequency.value=val;
   });
-  els.oscGain.addEventListener('input', e=>{ if(state.oscGainNode) state.oscGainNode.gain.value=parseFloat(e.target.value); });
-
-  // Combo type UI toggle
-  els.comboType.addEventListener('change', ()=>{
-    const isOsc = els.comboType.value==='osc';
-    els.comboOscPanel.classList.toggle('hide', !isOsc);
+  els.oscGain.addEventListener('input', e=>{
+    const v=parseFloat(e.target.value);
+    if(state.oscGainNode) state.oscGainNode.gain.value=v;
+    if(state.gainL) state.gainL.gain.value=v;
+    if(state.gainR) state.gainR.gain.value=v;
   });
-  els.comboOscPanel.classList.toggle('hide', els.comboType.value!=='osc');
+
+  // Stereo toggle & updates
+  els.stereoMode.addEventListener('change', ()=>{
+    const on = els.stereoMode.checked;
+    els.monoControls.classList.toggle('hide', on);
+    els.stereoControls.classList.toggle('hide', !on);
+    updateBeat();
+  });
+  [els.oscFreqL, els.oscFreqR, els.oscFreqInputL, els.oscFreqInputR, els.oscWaveL, els.oscWaveR]
+    .forEach(el => el && el.addEventListener('input', ()=>{
+      updateBeat();
+      if(state.oscNodeL){
+        const {fL} = getStereoFreqs();
+        state.oscNodeL.frequency.value = fL;
+        state.oscNodeL.type = els.oscWaveL.value;
+      }
+      if(state.oscNodeR){
+        const {fR} = getStereoFreqs();
+        state.oscNodeR.frequency.value = fR;
+        state.oscNodeR.type = els.oscWaveR.value;
+      }
+    }));
+
+  // Combo type UI toggle（見た目は常時表示だが、機能としてはosc選択時に使用）
+  els.comboType.addEventListener('change', ()=>{
+    // 表示は変えない（常時表示）
+  });
   els.comboOscFreqSlider.addEventListener('input', e=>{
     els.comboOscFreqInput.value=e.target.value;
   });
@@ -941,7 +1063,8 @@
   // init
   listDevices();
   startMic();
-  log('準備完了：正規化は初期OFF。オシレーターは20–600Hzスライダー＋600Hz超は数値優先。FFTはカーソルで周波数表示、トリガー位相固定＋N周期平均、ズーム＆マーカー対応。');
+  updateBeat();
+  log('修正版：録音＋発音のオシレーター設定を常時表示。任意振動数入力欄は見切れないよう拡幅。全機能維持。');
 })();</script>
 </body>
 </html>
