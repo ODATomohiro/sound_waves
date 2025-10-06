@@ -490,18 +490,41 @@
   }
 
   // Simple impulse/noise
-  function playStimulus(kind, durMs, gain=0.9){
+  async function playStimulus(kind, durMs, gain=0.9){
     if(!state.ctx) state.ctx = new (window.AudioContext||window.webkitAudioContext)();
     const ctx = state.ctx;
+
+    if(kind==='pulse'){
+      try{
+        const response = await fetch('インパルス実験用-Initial-.wav');
+        if(!response.ok) throw new Error('not found');
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        const src = ctx.createBufferSource();
+        src.buffer = audioBuffer;
+        const g = ctx.createGain(); g.gain.value = gain;
+        src.connect(g).connect(ctx.destination);
+        src.start();
+        setTimeout(()=>{ try{src.stop();}catch{} }, Math.ceil(audioBuffer.duration*1000));
+        log?.(`カスタムパルス再生 (${audioBuffer.duration.toFixed(3)}s)`);
+        return;
+      }catch(e){
+        log?.(`⚠ カスタム音源読み込み失敗 (${e.message}) → 標準パルスにフォールバック`);
+        // fall through to ideal impulse
+      }
+    }
+
     const frames = Math.max(1, Math.round(ctx.sampleRate * (durMs/1000)));
     const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
     const data = buffer.getChannelData(0);
-    if(kind==='pulse') data[0]=1.0; else for(let i=0;i<frames;i++) data[i]=(Math.random()*2-1)*0.5;
-    const src = ctx.createBufferSource(); src.buffer = buffer;
+    if(kind==='pulse'){ data[0]=1.0; }
+    else if(kind==='noise'){ for(let i=0;i<frames;i++) data[i]=(Math.random()*2-1)*0.5; }
+    else { data[0]=1.0; }
+    const srcNode = ctx.createBufferSource(); srcNode.buffer = buffer;
     const g = ctx.createGain(); g.gain.value = gain;
-    src.connect(g).connect(ctx.destination);
-    src.start();
-    setTimeout(()=>{ try{src.stop();}catch{} }, durMs+5);
+    srcNode.connect(g).connect(ctx.destination);
+    srcNode.start();
+    setTimeout(()=>{ try{srcNode.stop();}catch{} }, durMs+5);
   }
 
   // Oscillator (standalone)
@@ -741,12 +764,12 @@
       ya.forEach((db,idx)=>{ const y=Math.round((idx/(ya.length-1))*h); ctx.fillRect(0,y,6*DPR,1*DPR); ctx.fillText(db+'dB',6*DPR+2*DPR,Math.max(0,y-8*DPR)); });
     }
   }
-  function drawMarkers(ctx, spanSec){
+  function drawMarkers(ctx, spanSec, startSec=0){
     if(state.view!=='time') return;
     const w=state.w, h=state.h;
     const drawLine = (t, color)=>{
       if(t==null) return;
-      const x = Math.max(0, Math.min(w-1, t/spanSec * w));
+      const x = Math.max(0, Math.min(w-1, ((t - startSec)/spanSec) * w));
       ctx.save();
       ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=1*DPR;
       ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
@@ -825,7 +848,7 @@
     return a;
   }
 
-  function drawTimeFromArray(ctx, arr, sampleRate, spanSec){
+  function drawTimeFromArray(ctx, arr, sampleRate, spanSec, startSec=0){
     const w=state.w, h=state.h;
     const a = arr;
     const mid=h/2; const scaleY=h*0.42*state.gain;
@@ -838,7 +861,7 @@
     ctx.strokeStyle='#ffffff'; ctx.lineWidth=Math.max(1,2*DPR); ctx.stroke();
     const shownSec = spanSec || (a.length/sampleRate);
     drawAxes(ctx,{mode:'time', spanSec: shownSec});
-    drawMarkers(ctx, shownSec);
+    drawMarkers(ctx, shownSec, startSec);
   }
 
   function drawRealtimeTime(ctx){
@@ -880,6 +903,8 @@
     if(!full || full.length===0){ return drawNoData(ctx); }
     const [a,b]=state.tZoom; const ia=Math.floor(a*full.length), ib=Math.max(ia+1, Math.floor(b*full.length));
     let seg = full.subarray(ia, ib);
+    const totalSec = full.length / state.recSR;
+    const startSec = totalSec * a;
     if(els.cycleMode.checked){
       const est = estimateFreqFromSegment(seg, state.recSR);
       const Ncyc = Math.max(1, parseInt(els.cycleCount.value||'5',10));
@@ -889,7 +914,7 @@
       }
     }
     seg = scaleSegment(seg, state.recSR);
-    drawTimeFromArray(ctx, seg, state.recSR, seg.length/state.recSR);
+    drawTimeFromArray(ctx, seg, state.recSR, seg.length/state.recSR, startSec);
   }
   function drawRecordedFFT(ctx){
     const full = state.recVisSamples;
