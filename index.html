@@ -537,6 +537,11 @@
     if(els.stereoMode.checked){
       const useL = !!els.enableL.checked;
       const useR = !!els.enableR.checked;
+      // 両方OFFなら完全無音（ここで終了）
+      if(!useL && !useR){
+        log("Stereo mode: both L/R disabled → no sound");
+          return;
+        }
 
       if(useL){
         const oscL=ctx.createOscillator(); oscL.type=els.oscWaveL.value;
